@@ -51,13 +51,15 @@ public partial class App : Application
 
             _tray = new TrayHost(settings, _root);
             _tray.FullscreenRequested += CaptureFullscreen;
-            _tray.RegionRequested += CaptureFullscreen;   // replaced by the overlay in Task 9
+            _tray.RegionRequested += CaptureRegion;
+            _tray.CancelRequested += () => _session?.Cancel();
             _tray.ExitRequested += Shutdown;
 
             _hotkeys = new HotkeyService();
             _hotkeys.Pressed += id =>
             {
-                if (id is HotkeyId.Fullscreen or HotkeyId.Region) CaptureFullscreen();
+                if (id == HotkeyId.Fullscreen) CaptureFullscreen();
+                else if (id == HotkeyId.Region) CaptureRegion();
             };
 
             RegisterHotkeys();
@@ -103,6 +105,33 @@ public partial class App : Application
                    ?? frozen.Desktop.Monitors.First(m => m.IsPrimary);
 
         Report(_pipeline!.Complete(frozen, monitor.Bounds, app, title));
+    }
+
+    private CaptureSession? _session;
+
+    private void CaptureRegion()
+    {
+        if (_session is not null) return;   // a capture is already in flight
+
+        var (app, title) = ForegroundWindow.Describe();
+        var frozen = _grabber.Grab();
+
+        _session = new CaptureSession(frozen);
+        _session.Cancelled += () => { _session?.Dispose(); _session = null; };
+        _session.Committed += region =>
+        {
+            var outcome = _pipeline!.Complete(frozen, region, app, title);
+            _session?.Dispose();
+            _session = null;
+            Report(outcome);
+        };
+
+        if (!_session.Start())
+        {
+            _session = null;
+            _tray!.ShowBalloon("Capture cancelled",
+                "Windows would not allow the capture overlay to take focus. Try again.", isError: true);
+        }
     }
 
     private void Report(CaptureOutcome outcome)

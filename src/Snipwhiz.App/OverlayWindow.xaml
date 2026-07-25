@@ -1,0 +1,16 @@
+<Window x:Class="Snipwhiz.App.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
+        Topmost="True" AllowsTransparency="False" Background="Black"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        Cursor="Cross">
+  <Grid x:Name="Root" ClipToBounds="True">
+    <!-- The frozen screen, rendered at exactly 1:1 physical pixels. -->
+    <Image x:Name="Frozen" Stretch="None"
+           RenderOptions.BitmapScalingMode="NearestNeighbor"
+           RenderOptions.EdgeMode="Aliased"
+           HorizontalAlignment="Left" VerticalAlignment="Top" />
+    <Canvas x:Name="Layer" />
+  </Grid>
+</Window>
