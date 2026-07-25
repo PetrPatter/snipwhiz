@@ -28,3 +28,6 @@ GlobalLock
 GlobalUnlock
 GlobalFree
 BITMAPV5HEADER
+GetForegroundWindow
+GetWindowTextW
+GetWindowThreadProcessId
