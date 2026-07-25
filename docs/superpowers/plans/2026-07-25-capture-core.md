@@ -200,9 +200,10 @@ public class PixelRectTests
     [Fact]
     public void ClampTo_pulls_a_rect_inside_the_bounds()
     {
+        // bounds spans x -1920..1920, r spans x -2500..-1500 => overlap is -1920..-1500
         var bounds = new PixelRect(-1920, 0, 3840, 1080);
         var r = new PixelRect(-2500, -50, 1000, 2000);
-        Assert.Equal(new PixelRect(-1920, 0, 580, 1080), r.ClampTo(bounds));
+        Assert.Equal(new PixelRect(-1920, 0, 420, 1080), r.ClampTo(bounds));
     }
 }
 ```
