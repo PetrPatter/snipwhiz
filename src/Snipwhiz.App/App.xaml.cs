@@ -59,11 +59,13 @@ public partial class App : Application
             _hotkeys.Pressed += id =>
             {
                 if (id == HotkeyId.Fullscreen) CaptureFullscreen();
-                else if (id == HotkeyId.Region) CaptureRegion();
+                else if (id is HotkeyId.Region or HotkeyId.PrintScreenRegion) CaptureRegion();
             };
 
             RegisterHotkeys();
             _tray.ShowBalloon("Snipwhiz is running", "Press Ctrl+Shift+2 to capture the screen.");
+
+            OfferPrintScreenTakeover(settings);
         }
         catch (Exception ex)
         {
@@ -93,6 +95,61 @@ public partial class App : Application
         if (!_hotkeys.TryRegister(HotkeyId.Fullscreen, mods, vk2))
             _tray!.ShowBalloon("Hotkey unavailable",
                 "Ctrl+Shift+2 is held by another application. Use the tray menu instead.", isError: true);
+    }
+
+    private void OfferPrintScreenTakeover(Settings settings)
+    {
+        if (settings.PrintScreenPromptAnswered) return;
+
+        if (!PrintScreenTakeover.IsSnippingToolBound())
+        {
+            // Nothing to take over — just claim it.
+            TryClaimPrintScreen(settings);
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            "Use PrintScreen for Snipwhiz?\n\n" +
+            "This turns off the Windows Snipping Tool shortcut. You can change it back " +
+            "in Settings > Accessibility > Keyboard at any time.\n\n" +
+            "Snipwhiz already works with Ctrl+Shift+1 and Ctrl+Shift+2.",
+            "Snipwhiz",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        settings.PrintScreenPromptAnswered = true;
+
+        if (answer == MessageBoxResult.Yes)
+        {
+            PrintScreenTakeover.Release();
+            TryClaimPrintScreen(settings);
+        }
+
+        settings.Save(_root);
+    }
+
+    private void TryClaimPrintScreen(Settings settings)
+    {
+        var claimed = _hotkeys!.TryRegister(
+            HotkeyId.PrintScreenRegion, 0, HotkeyService.VkPrintScreen);
+
+        settings.PrintScreenTakenOver = claimed;
+        settings.Save(_root);
+
+        if (claimed)
+        {
+            _tray!.ShowBalloon("PrintScreen is almost ready",
+                "Sign out and back in to finish switching PrintScreen away from Snipping Tool.");
+        }
+        else
+        {
+            var holder = PrintScreenTakeover.DescribeLikelyHolder();
+            _tray!.ShowBalloon("PrintScreen unavailable",
+                holder is null
+                    ? "Another application is holding the PrintScreen key. Ctrl+Shift+1 still works."
+                    : $"{holder} is holding the PrintScreen key. Ctrl+Shift+1 still works.",
+                isError: true);
+        }
     }
 
     private void CaptureFullscreen()

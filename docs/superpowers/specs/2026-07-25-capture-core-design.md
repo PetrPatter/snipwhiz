@@ -576,9 +576,16 @@ mixed-DPI multi-monitor and never came back to the shipping baseline:
 
 ## 9. Open question
 
-**PrintScreen takeover timing** (§4.7) — determine during implementation whether
-clearing `PrintScreenKeyForSnippingEnabled` applies immediately or needs a
-sign-out, and word the prompt to match. Affects copy, not design.
+**Resolved during implementation (Task 11).** Clearing
+`PrintScreenKeyForSnippingEnabled` and re-registering the hotkey **does not**
+take effect in the current session — verified by clearing the value, confirming
+`RegisterHotKey` succeeded (`PrintScreenTakenOver: true`), and pressing
+PrintScreen: no overlay opened and no `WM_HOTKEY` arrived, with the setting
+correctly at `0` the whole time. A sign-out is required before Windows stops
+routing PrintScreen to Snipping Tool. The balloon copy in `TryClaimPrintScreen`
+now says so plainly ("Sign out and back in to finish switching PrintScreen away
+from Snipping Tool") rather than hedging with "if it still opens Snipping
+Tool".
 
 **Resolved since rev. 1:** product name is Snipwhiz; the WGC-latency and
 capture-library spikes were dissolved by the `BitBlt` decision; the grab-latency
