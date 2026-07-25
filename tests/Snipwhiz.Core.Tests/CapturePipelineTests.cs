@@ -28,14 +28,21 @@ public class CapturePipelineTests : IDisposable
     [Fact]
     public void Clipboard_is_written_before_disk()
     {
-        using var store = new CaptureStore(_root);
         var order = new List<string>();
+
+        // CaptureStore.Save calls newId() as its first statement, so this records
+        // the moment the disk write begins — no extra seam needed.
+        using var store = new CaptureStore(_root, () =>
+        {
+            order.Add("disk");
+            return Guid.CreateVersion7();
+        });
         var pipeline = new CapturePipeline(store, _ => order.Add("clipboard"));
 
         var outcome = pipeline.Complete(Frozen(), new PixelRect(0, 0, 10, 10), "app", "title");
-        order.Add("disk");   // Save already happened inside Complete
 
-        Assert.Equal("clipboard", order[0]);
+        // Strict sequence: reversing the two calls in Complete must fail this.
+        Assert.Equal(new[] { "clipboard", "disk" }, order);
         Assert.True(outcome.ClipboardOk);
         Assert.True(outcome.SaveOk);
     }
