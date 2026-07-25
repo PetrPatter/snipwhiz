@@ -24,14 +24,6 @@
     <AdditionalFiles Include="NativeMethods.txt" />
   </ItemGroup>
 
-  <!-- OverlayWindow (Snipwhiz.App) calls SetWindowPos/GetWindowLong/SetWindowLong
-       directly, per the Task 8 brief. CsWin32's generated PInvoke class is internal
-       by default; this grants App access without making the whole Win32 surface
-       public. -->
-  <ItemGroup>
-    <InternalsVisibleTo Include="Snipwhiz.App" />
-  </ItemGroup>
-
   <!-- SQLitePCLRaw.lib.e_sqlite3 2.1.11 bundles a SQLite older than 3.50.2,
        which has a memory-corruption bug when aggregate terms outnumber
        available columns (CVE-2025-6965). No patched SQLitePCLRaw exists yet.

@@ -34,9 +34,3 @@ GetWindowThreadProcessId
 RegisterHotKey
 UnregisterHotKey
 HOT_KEY_MODIFIERS
-SetWindowPos
-SET_WINDOW_POS_FLAGS
-GetWindowLong
-SetWindowLong
-WINDOW_LONG_PTR_INDEX
-WINDOW_EX_STYLE

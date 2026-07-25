@@ -33,4 +33,21 @@
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
   </ItemGroup>
 
+  <!-- OverlayWindow calls SetWindowPos/GetWindowLong/SetWindowLong/GetWindowRect
+       directly. Rather than granting App visibility into all of Core's internals
+       (LibraryDb, CaptureStore, Settings, ...) via InternalsVisibleTo for the sake
+       of three P/Invoke calls, App generates its own private copy of just the Win32
+       surface it needs. Same package already in the repo (Core references it too),
+       not a new dependency; PrivateAssets=all means nothing ships. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.298">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="NativeMethods.txt" />
+  </ItemGroup>
+
 </Project>

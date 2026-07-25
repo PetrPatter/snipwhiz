@@ -116,14 +116,36 @@ public partial class App : Application
         var (app, title) = ForegroundWindow.Describe();
         var frozen = _grabber.Grab();
 
+        // Manual, re-auditable 1:1-rendering verification harness (see
+        // Diagnostics.OverlayVerification for how to run it, including the
+        // required negative control). Completely inert — one env-var read, no
+        // behavior change — unless explicitly enabled; does not touch _session.
+        if (Diagnostics.OverlayVerification.IsEnabled)
+        {
+            Diagnostics.OverlayVerification.Run(frozen);
+            return;
+        }
+
         _session = new CaptureSession(frozen);
         _session.Cancelled += () => { _session?.Dispose(); _session = null; };
         _session.Committed += region =>
         {
-            var outcome = _pipeline!.Complete(frozen, region, app, title);
-            _session?.Dispose();
-            _session = null;
-            Report(outcome);
+            // Complete() can throw (disk full, DB locked, clipboard denied — all
+            // realistic) and unwind to DispatcherUnhandledException, which swallows
+            // it. Without the finally, _session would stay non-null forever,
+            // making the "already in flight" guard above a permanent no-op for
+            // Ctrl+Shift+1 while Ctrl+Shift+2 kept working — silent, confusing
+            // breakage for the rest of the process's life.
+            try
+            {
+                var outcome = _pipeline!.Complete(frozen, region, app, title);
+                Report(outcome);
+            }
+            finally
+            {
+                _session?.Dispose();
+                _session = null;
+            }
         };
 
         if (!_session.Start())
@@ -144,6 +166,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _session?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();
         _store?.Dispose();
