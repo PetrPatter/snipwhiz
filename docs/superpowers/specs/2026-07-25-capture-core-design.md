@@ -191,9 +191,23 @@ revisit this will reverse it for a cause that was never true.
 **Flags: `SRCCOPY | CAPTUREBLT`.** By default `BitBlt` from the screen DC
 excludes layered windows — you lose menu and tooltip shadows, transparent overlay
 windows, and some IME candidate windows. ShareX and Greenshot both pass
-`CAPTUREBLT` for exactly this reason. It has a known cost (brief cursor flicker
-or screen blink on some configurations). We accept the flicker; missing content
-in a screenshot is a correctness bug, flicker is a cosmetic one.
+`CAPTUREBLT` for exactly this reason. It has a known cosmetic cost (brief cursor
+flicker or screen blink on some configurations), which we accept: missing content
+in a screenshot is a correctness bug, flicker is not.
+
+**Measured, 2026-07-25** (dual display, 3840×1257, 125% + 100%, hybrid
+Quadro P3200 + Intel UHD 630), median of 15 after warmup:
+
+| Variant | Median |
+|---|---|
+| `SRCCOPY \| CAPTUREBLT`, whole desktop | 66.6–67.0 ms |
+| `SRCCOPY` alone, whole desktop | 66.6–66.7 ms |
+| `SRCCOPY \| CAPTUREBLT`, per-monitor, summed | 66.3–66.9 ms |
+
+**`CAPTUREBLT` costs no measurable time**, so the flag is free correctness rather
+than a tradeoff. Splitting the grab per monitor to avoid one cross-adapter span
+saves nothing either — the cost is inherent to reading a desktop composited
+across two adapters.
 
 **What `BitBlt` cannot capture — two distinct classes, not one:**
 
@@ -231,6 +245,31 @@ monitor configuration we ship to:
 - **Over 120 ms** → switch the freeze path to **DXGI Desktop Duplication**
   (§4.4). That is a different architecture, not a tuning pass, which is why it
   is decided up front rather than discovered late.
+
+**Measured, 2026-07-25 — gate PASSED, with less headroom than assumed:**
+
+| Configuration | Displays | MP | Median |
+|---|---|---|---|
+| Laptop only (DPI-virtualised, invalid) | 1 | 1.3 | 32.0 ms |
+| Laptop only, DPI-aware | 1 | 2.1 | 33.1 ms |
+| Laptop + external, 125% + 100% | **2** | 4.8 | **79.6 ms** |
+
+**The cost driver is display count, not pixel count.** Going 1.3 → 2.1 MP on one
+display cost 4%; adding a second display cost 140%. The test machine has hybrid
+graphics (Quadro P3200 + Intel UHD 630), so spanning the grab forces a
+cross-adapter composite.
+
+Consequences to carry forward:
+
+- Two displays consume **66% of the budget**. A third display, or 4K panels,
+  could plausibly exceed it. Recheck on real target hardware — §7 item 7.
+- **Do not extrapolate this by pixel count.** That was tried twice during
+  planning and was wrong in both directions, badly.
+- ~13 ms of the 79.6 ms is `Grab()` re-enumerating monitors and reading cursor
+  state on every call. Caching enumeration behind a `WM_DISPLAYCHANGE`
+  invalidation is the known lever if headroom is ever needed. **Not done now:**
+  the gate passes, and stale monitor topology after a hot-plug is a worse bug
+  than 13 ms.
 
 ### 4.6 No capture library, but GDI handles still need owning
 
