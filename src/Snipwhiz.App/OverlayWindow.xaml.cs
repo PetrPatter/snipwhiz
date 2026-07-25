@@ -152,6 +152,18 @@ public partial class OverlayWindow : Window
         try
         {
             var hwnd = new WindowInteropHelper(this).Handle;
+
+            // This runs deferred at ApplicationIdle, so the session can already have
+            // torn this overlay down before it executes — a display-change cancel does
+            // exactly that, and WPF's own WM_DISPLAYCHANGE handling queues one of these
+            // on the way out. A closed window has no HWND and is showing the user
+            // nothing, so there is no 1:1 invariant left to enforce. Measured: without
+            // this guard every display-change cancel also raised a bogus "could not be
+            // placed at its correct physical size" balloon (hwnd=0, rect 0,0,0,0),
+            // twice per capture — the invariant reporting on a window that no longer
+            // exists. The invariant itself is unchanged for any window that does.
+            if (hwnd == IntPtr.Zero) return;
+
             if (!PhysicalBoundsMatch(hwnd))
             {
                 ApplyPhysicalBounds(hwnd);
@@ -159,9 +171,13 @@ public partial class OverlayWindow : Window
                 {
                     // Still wrong after a direct reapply: showing a mis-scaled
                     // opaque overlay would silently corrupt whatever the user
-                    // selects. Abort this capture rather than show it.
-                    Cancelled?.Invoke();
-                    return;
+                    // selects. Abort this capture rather than show it — by
+                    // throwing, so the catch below tears down AND the user gets
+                    // the balloon. Returning silently here meant the user pressed
+                    // a hotkey, nothing happened, and nothing said why (§6).
+                    throw new InvalidOperationException(
+                        $"The overlay for {_monitor.DeviceName} could not be placed at its " +
+                        "correct physical size; capture cancelled.");
                 }
             }
 
@@ -173,10 +189,9 @@ public partial class OverlayWindow : Window
                 // current state and re-check before giving up.
                 RenderFrozenSlice();
                 if (!RenderedImageSizeMatches())
-                {
-                    Cancelled?.Invoke();
-                    return;
-                }
+                    throw new InvalidOperationException(
+                        $"The overlay for {_monitor.DeviceName} could not be rendered at 1:1 " +
+                        "physical pixels; capture cancelled.");
             }
 
             // A DPI change mid-session (this method also runs from WM_DPICHANGED,

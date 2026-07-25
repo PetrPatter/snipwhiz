@@ -3361,12 +3361,16 @@ Date: <date>
 |---|-------|--------|
 | 10 | Paste into Word, Paint, Chrome, Slack — no black or blue backgrounds | |
 | 11 | Hotkeys register on a stock box; accept and decline the PrintScreen prompt | |
-| 12 | UAC prompt while the overlay is open — clean abort, no orphaned window | |
-| 13 | Overlay over an elevated foreground window — aborts rather than hanging | |
-| 14 | Disconnect a monitor while the overlay is open — clean abort, no crash | |
-| 15 | Autostart survives a reboot | |
-| 16 | Second instance focuses the first | |
-| 17 | Soak: repeated captures, GDI handle count stays flat in Task Manager | |
+| 12 | Overlay over an elevated foreground window — aborts rather than hanging | |
+| 13 | Disconnect a monitor while the overlay is open — overlays close, balloon explains why, Ctrl+Shift+1 still works after | |
+| 14 | Autostart survives a reboot | |
+| 15 | Second instance exits silently, leaving the first running | |
+| 16 | Soak: repeated captures — GDI handle count **and managed working set** both stay flat | |
+
+Item 12 in earlier revisions ("UAC prompt while the overlay is open — clean
+abort") has been removed: there is no desktop-switch abort and spec 1 does not
+implement one. See §8 of the spec for why, and for the fact that Esc and
+right-click remain the exit in that situation.
 
 ## Known limitations confirmed
 

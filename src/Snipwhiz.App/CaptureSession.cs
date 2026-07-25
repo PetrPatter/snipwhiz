@@ -17,6 +17,7 @@ public sealed class CaptureSession : IDisposable
     private readonly List<OverlayWindow> _overlays = [];
     private readonly FrozenDesktop _frozen;
     private readonly DispatcherTimer _watchdog;
+    private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private bool _closed;
 
     public FrozenDesktop Frozen => _frozen;
@@ -26,11 +27,19 @@ public sealed class CaptureSession : IDisposable
     public event Action<PixelRect>? Committed;
     public event Action? Cancelled;
 
+    /// <summary>
+    /// Raised with a short reason whenever the session tears itself down for a
+    /// cause the user did not ask for. Esc and right-click are deliberately silent —
+    /// the user already knows they cancelled — but a watchdog timeout or a display
+    /// change must be reported, or the overlay just vanishes with no explanation.
+    /// </summary>
+    public event Action<string>? Aborted;
+
     public CaptureSession(FrozenDesktop frozen)
     {
         _frozen = frozen;
         _watchdog = new DispatcherTimer { Interval = WatchdogTimeout };
-        _watchdog.Tick += (_, _) => Cancel();
+        _watchdog.Tick += (_, _) => Abort("The capture overlay closed itself after 60 seconds without input.");
 
         // The frozen buffer is invalid the moment the monitor topology changes
         // (hot-unplug, sleep/resume re-detect, resolution change). Bail out rather
@@ -39,7 +48,29 @@ public sealed class CaptureSession : IDisposable
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
 
-    private void OnDisplaySettingsChanged(object? sender, EventArgs e) => Cancel();
+    // SystemEvents raises this on its own pump thread (".NET System Events"), never
+    // the UI thread. Window.Close() from there throws "the calling thread cannot
+    // access this object", and SystemEvents swallows that exception — which used to
+    // leave the overlays up with every escape route already latched shut.
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
+        _dispatcher.BeginInvoke(new Action(() =>
+            Abort("The display configuration changed, so the capture was cancelled.")));
+
+    /// <summary>Cancels and reports why. Silent when the session is already finished.</summary>
+    private void Abort(string reason)
+    {
+        if (_closed) return;
+        Aborted?.Invoke(reason);
+        Cancel();
+    }
+
+    /// <summary>Restarts the 60 s idle watchdog. §4.11 counts 60 s without input, not since Start().</summary>
+    private void ResetWatchdog()
+    {
+        if (_closed) return;
+        _watchdog.Stop();
+        _watchdog.Start();
+    }
 
     /// <returns>False when the overlay could not be brought to the foreground.</returns>
     public bool Start()
@@ -80,9 +111,14 @@ public sealed class CaptureSession : IDisposable
 
             foreach (var overlay in _overlays)
             {
-                overlay.DragStarted += (x, y) => Selection.BeginDrag(x, y);
+                overlay.DragStarted += (x, y) =>
+                {
+                    ResetWatchdog();
+                    Selection.BeginDrag(x, y);
+                };
                 overlay.PointerMoved += (x, y) =>
                 {
+                    ResetWatchdog();
                     Selection.UpdateDrag(x, y);
                     foreach (var o in _overlays) o.MoveLoupe(x, y);
                 };
@@ -126,33 +162,72 @@ public sealed class CaptureSession : IDisposable
         }
     }
 
+    // Commit and Cancel deliberately do NOT latch _closed before doing the work.
+    // That shape is what turned one recoverable throw inside CloseOverlays into an
+    // unrecoverable trap: the latch was already shut, the watchdog already stopped,
+    // and Cancelled had not fired — so Esc, right-click, the tray menu, the watchdog
+    // and even completing a drag all became no-ops behind opaque fullscreen windows.
+    // The latch and the notification now both happen in a finally, so no exception
+    // anywhere in teardown can leave the session both un-torn-down and un-exitable.
+
     public void Commit(PixelRect region)
     {
         if (_closed) return;
-        _closed = true;
-        CloseOverlays();
-        Committed?.Invoke(region);
+        try
+        {
+            CloseOverlays();
+        }
+        finally
+        {
+            _closed = true;
+            Committed?.Invoke(region);
+        }
     }
 
     public void Cancel()
     {
         if (_closed) return;
-        _closed = true;
-        CloseOverlays();
-        Cancelled?.Invoke();
+        try
+        {
+            CloseOverlays();
+        }
+        finally
+        {
+            _closed = true;
+            Cancelled?.Invoke();
+        }
     }
 
     private void CloseOverlays()
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         _watchdog.Stop();
-        foreach (var overlay in _overlays) overlay.Close();
+
+        // Snapshot and clear first: Close() raises events and can re-enter this
+        // path, and a second pass over a list being mutated would throw out of the
+        // loop and strand whatever had not been closed yet.
+        var overlays = _overlays.ToArray();
         _overlays.Clear();
+
+        foreach (var overlay in overlays)
+        {
+            // One window refusing to close must never prevent the others closing.
+            // There is nothing useful to do with the exception here — the session
+            // is already going away — and rethrowing would defeat the whole point.
+            try { overlay.Close(); }
+            catch (Exception) { }
+        }
     }
 
     public void Dispose()
     {
-        _closed = true;
-        CloseOverlays();
+        try
+        {
+            CloseOverlays();
+        }
+        finally
+        {
+            _closed = true;
+        }
     }
 }

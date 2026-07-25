@@ -96,6 +96,31 @@ public class CapturePipelineTests : IDisposable
     }
 
     [Fact]
+    public void A_failing_database_insert_reports_the_disk_write_message_and_leaves_no_orphan_png()
+    {
+        // Save writes the PNG first and inserts the row second, so a full disk or a
+        // locked DB surfaces as SqliteException from the insert — which used to fall
+        // straight through the handler as a generic failure and strand the PNG.
+        var id = Guid.CreateVersion7();
+        using var store = new CaptureStore(_root, () => id);
+        var pipeline = new CapturePipeline(store, _ => { });
+
+        var first = pipeline.Complete(Frozen(), new PixelRect(0, 0, 10, 10), "app", "title");
+        var path = Path.Combine(_root, first.Record!.FilePath);
+
+        // Free the filename so the *insert* (duplicate primary key) is what fails,
+        // rather than the FileMode.CreateNew write.
+        File.Delete(path);
+
+        var outcome = pipeline.Complete(Frozen(), new PixelRect(0, 0, 10, 10), "app", "title");
+
+        Assert.False(outcome.SaveOk);
+        Assert.Null(outcome.Record);
+        Assert.Contains("saving to disk failed", outcome.Warning!);
+        Assert.False(File.Exists(path));   // the orphan PNG was cleaned up
+    }
+
+    [Fact]
     public void A_normal_capture_produces_no_warning()
     {
         using var store = new CaptureStore(_root);

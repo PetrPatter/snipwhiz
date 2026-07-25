@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Data.Sqlite;
 using Snipwhiz.Core.Capture;
 using Snipwhiz.Core.Clipboard;
 using Snipwhiz.Core.Geometry;
@@ -75,7 +76,11 @@ public sealed class CapturePipeline(CaptureStore store, Action<CroppedImage>? wr
         {
             record = store.Save(image, sourceApp, sourceTitle);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        // SqliteException belongs here too: Save writes the PNG and then inserts a
+        // row, and a full disk or a locked DB fails at the insert. Without it the
+        // user got a generic failure instead of the disk-write message this row of
+        // §6's table promises.
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or SqliteException)
         {
             saveOk = false;
             warning ??= $"Copied to the clipboard, but saving to disk failed: {e.Message}";

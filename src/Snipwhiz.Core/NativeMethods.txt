@@ -16,7 +16,6 @@ BITMAPINFO
 BI_COMPRESSION
 DIB_USAGE
 GetCursorInfo
-GetCursorPos
 GetIconInfo
 OpenClipboard
 CloseClipboard

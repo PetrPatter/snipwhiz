@@ -47,7 +47,20 @@ public sealed class CaptureStore : IDisposable
         }
 
         var record = new CaptureRecord(id, now, image.Width, image.Height, sourceApp, sourceTitle, relativePath);
-        _db.Insert(record);
+        try
+        {
+            _db.Insert(record);
+        }
+        catch
+        {
+            // The PNG is already on disk; if the row never lands, nothing will ever
+            // reference that file again. Delete it rather than let a failing DB
+            // silently fill the capture folder with orphans. Best-effort by design:
+            // a failure to clean up must not replace the real fault the caller needs.
+            try { File.Delete(absolutePath); }
+            catch (Exception) { }
+            throw;
+        }
         return record;
     }
 

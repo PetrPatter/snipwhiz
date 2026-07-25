@@ -160,6 +160,17 @@ public partial class App : Application
 
     private void CaptureFullscreen()
     {
+        // Ctrl+Shift+2 is one digit away from Ctrl+Shift+1, so it gets pressed by
+        // mistake while the overlays are up. Without this guard it grabs the screen
+        // *including* the dim layer, selection border and loupe, then writes that
+        // immutably to disk with a DB row and overwrites the clipboard with it.
+        if (_session is not null)
+        {
+            _tray!.ShowBalloon("Capture already in progress",
+                "Finish the region selection, or press Esc or right-click to cancel it first.");
+            return;
+        }
+
         var (app, title) = ForegroundWindow.Describe();
         var frozen = _grabber.Grab();
 
@@ -191,6 +202,11 @@ public partial class App : Application
 
         _session = new CaptureSession(frozen);
         _session.Cancelled += () => { _session?.Dispose(); _session = null; };
+
+        // Esc and right-click stay silent — the user knows they cancelled. Everything
+        // else that closes the overlay does so for a reason the user cannot see, and
+        // §6 says silent failure is not acceptable.
+        _session.Aborted += reason => _tray!.ShowBalloon("Capture cancelled", reason, isError: true);
         _session.Committed += region =>
         {
             // Complete() can throw (disk full, DB locked, clipboard denied — all

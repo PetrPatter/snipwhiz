@@ -23,9 +23,14 @@ public sealed class Settings
         {
             return JsonSerializer.Deserialize<Settings>(File.ReadAllText(path)) ?? new Settings();
         }
-        catch (JsonException)
+        // A corrupt settings file must never stop the app starting — and neither must
+        // an unreadable one. Antivirus and file-sync clients hold this file open often
+        // enough that the IOException escaped to OnStartup's catch and showed
+        // "Snipwhiz could not start", which is the exact outcome this catch exists
+        // to prevent. Three defaulted booleans are always recoverable; startup is not.
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
         {
-            return new Settings();   // a corrupt settings file must never stop the app starting
+            return new Settings();
         }
     }
 

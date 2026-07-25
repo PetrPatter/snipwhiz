@@ -44,14 +44,25 @@ public static class MonitorEnumerator
         var r = mi.monitorInfo.rcMonitor;
 
         // MDT_EFFECTIVE_DPI is the scale the user actually chose in Settings.
-        PInvoke.GetDpiForMonitor(monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var dpiX, out _);
+        var hr = PInvoke.GetDpiForMonitor(monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var dpiX, out _);
 
         list.Add(new MonitorInfo(
             DeviceName: mi.szDevice.ToString(),
             Bounds: new PixelRect(r.left, r.top, r.right - r.left, r.bottom - r.top),
-            Scale: dpiX / 96.0,
+            Scale: ScaleFrom(hr.Succeeded, dpiX),
             IsPrimary: (mi.monitorInfo.dwFlags & 1u) != 0));   // MONITORINFOF_PRIMARY
 
         return true;
     }
+
+    /// <summary>
+    /// Turns a <c>GetDpiForMonitor</c> result into a scale factor. The HRESULT was
+    /// previously ignored: on failure <c>dpiX</c> is left at 0, giving Scale 0, which
+    /// makes <see cref="Dpi.PhysicalToDip"/> return Infinity and every DIP conversion
+    /// for that monitor garbage. 100% is the only safe fallback — an overlay at the
+    /// wrong scale is still caught by OverlayWindow's 1:1 invariant, an Infinity is not.
+    /// Public because it is the one piece of this file testable without a display.
+    /// </summary>
+    public static double ScaleFrom(bool succeeded, uint dpiX) =>
+        succeeded && dpiX != 0 ? dpiX / 96.0 : 1.0;
 }
