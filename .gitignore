@@ -36,6 +36,9 @@ Releases/
 *.WebView2/
 EBWebView/
 
+# Subagent-driven-development scratch (ledger, briefs, review packages)
+.superpowers/
+
 # OS
 Thumbs.db
 ehthumbs.db
