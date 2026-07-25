@@ -76,11 +76,15 @@ public sealed class CaptureSession : IDisposable
         }
         catch
         {
-            // Show() raises Loaded synchronously, which runs RenderFrozenSlice (an
-            // ~8MB Crop + BitmapSource.Create per monitor) inside this loop. If that
-            // throws, Activate() is never reached — no overlay has focus, so Esc
-            // goes nowhere and only right-click remains — and without this catch,
-            // the overlays stay up with nothing torn down.
+            // Covers OverlayWindow construction, ShowAt (native HWND creation and
+            // the initial Show()/layout pass), and designated.Activate(): if any of
+            // those throw mid-loop, no overlay has focus (Activate() never reached),
+            // so Esc goes nowhere and only right-click remains — and without this
+            // catch, the overlays stay up with nothing torn down. Note this does
+            // NOT cover RenderFrozenSlice: OverlayWindow defers that (and the
+            // physical-bounds/DPI invariant check) to DispatcherPriority.ApplicationIdle
+            // via EnsureCorrectRendering, which runs after Start() has already
+            // returned — that path has its own try/catch for the same reason.
             Cancel();
             throw;
         }

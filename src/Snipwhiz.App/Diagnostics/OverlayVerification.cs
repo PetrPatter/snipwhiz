@@ -95,8 +95,13 @@ internal static class OverlayVerification
             settle.Stop();
             try
             {
+                // Overlays.Count == 0 here means the session already tore itself
+                // down (e.g. the OverlayWindow physical-bounds/DPI-size invariant
+                // tripped) before we even got to regrab — direct proof of an abort,
+                // independent of the pixel comparison below.
+                var selfAborted = session.Overlays.Count == 0;
                 var regrab = new BitBltGrabber().Grab();
-                WriteReport(testFrozen, regrab, markers, breakScale);
+                WriteReport(testFrozen, regrab, markers, breakScale, selfAborted);
             }
             finally
             {
@@ -124,11 +129,14 @@ internal static class OverlayVerification
 
     private static void WriteReport(
         FrozenDesktop expected, FrozenDesktop actual,
-        List<(string Device, PixelRect Rect)> markers, bool breakScale)
+        List<(string Device, PixelRect Rect)> markers, bool breakScale, bool selfAborted)
     {
         var lines = new List<string>
         {
-            $"mode={(breakScale ? "NEGATIVE CONTROL (Scale forced wrong on first monitor)" : "POSITIVE CONTROL")}"
+            $"mode={(breakScale ? "NEGATIVE CONTROL (Scale forced wrong on first monitor)" : "POSITIVE CONTROL")}",
+            $"sessionSelfAborted={selfAborted} (true = the physical-bounds/DPI-size invariant tripped and " +
+            "cancelled the session before this regrab; the pixel comparison below then reflects the LIVE " +
+            "desktop, not the overlay, since the overlay is already gone)"
         };
 
         foreach (var (device, rect) in markers)
