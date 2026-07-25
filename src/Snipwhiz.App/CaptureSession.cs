@@ -57,6 +57,7 @@ public sealed class CaptureSession : IDisposable
             {
                 var overlay = new OverlayWindow(_frozen, monitor);
                 overlay.Cancelled += Cancel;
+                overlay.AttachLoupe(_frozen);
                 _overlays.Add(overlay);
                 overlay.ShowAt(activate: monitor.DeviceName == active.DeviceName);
             }
@@ -80,7 +81,11 @@ public sealed class CaptureSession : IDisposable
             foreach (var overlay in _overlays)
             {
                 overlay.DragStarted += (x, y) => Selection.BeginDrag(x, y);
-                overlay.PointerMoved += (x, y) => Selection.UpdateDrag(x, y);
+                overlay.PointerMoved += (x, y) =>
+                {
+                    Selection.UpdateDrag(x, y);
+                    foreach (var o in _overlays) o.MoveLoupe(x, y);
+                };
                 overlay.DragEnded += () =>
                 {
                     if (Selection.EndDrag() is { } rect) Commit(rect);

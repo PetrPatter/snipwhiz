@@ -305,6 +305,33 @@ public partial class OverlayWindow : Window
         _border.Visibility = Visibility.Visible;
     }
 
+    private Loupe? _loupe;
+
+    public void AttachLoupe(FrozenDesktop frozen)
+    {
+        _loupe = new Loupe(frozen);
+        Layer.Children.Add(_loupe);
+    }
+
+    /// <summary>Moves the loupe, flipping it near edges so it never leaves the screen.</summary>
+    public void MoveLoupe(int virtualX, int virtualY)
+    {
+        if (_loupe is null) return;
+
+        _loupe.Update(virtualX, virtualY);
+
+        var x = Dpi.PhysicalToDip(virtualX - _monitor.Bounds.X, _monitor.Scale) + 18;
+        var y = Dpi.PhysicalToDip(virtualY - _monitor.Bounds.Y, _monitor.Scale) + 18;
+
+        if (x + 136 > ActualWidth) x -= 136 + 36;
+        if (y + 170 > ActualHeight) y -= 170 + 36;
+
+        Canvas.SetLeft(_loupe, Math.Max(4, x));
+        Canvas.SetTop(_loupe, Math.Max(4, y));
+        _loupe.Visibility = _monitor.Bounds.Contains(virtualX, virtualY)
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     public void ShowAt(bool activate)
     {
         if (activate) Show();

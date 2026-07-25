@@ -55,6 +55,15 @@ public sealed class FrozenDesktop
         return new CroppedImage(dst, clamped.Width, clamped.Height, HasUncovered(clamped));
     }
 
+    /// <summary>Reads one pixel in virtual physical pixels. Out of bounds reads as black.</summary>
+    public (byte R, byte G, byte B) SampleAt(int virtualX, int virtualY)
+    {
+        if (!Bounds.Contains(virtualX, virtualY)) return (0, 0, 0);
+
+        var i = ((long)(virtualY - Bounds.Y) * Width + (virtualX - Bounds.X)) * 4;
+        return (Bgra[i + 2], Bgra[i + 1], Bgra[i + 0]);
+    }
+
     private bool HasUncovered(PixelRect region)
     {
         // Covered area is a union of rectangles, so it is enough to check whether
