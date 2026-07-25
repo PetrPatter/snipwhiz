@@ -18,3 +18,13 @@ DIB_USAGE
 GetCursorInfo
 GetCursorPos
 GetIconInfo
+OpenClipboard
+CloseClipboard
+EmptyClipboard
+SetClipboardData
+RegisterClipboardFormat
+GlobalAlloc
+GlobalLock
+GlobalUnlock
+GlobalFree
+BITMAPV5HEADER
