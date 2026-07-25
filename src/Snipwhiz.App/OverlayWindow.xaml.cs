@@ -26,10 +26,23 @@ public partial class OverlayWindow : Window
     private readonly FrozenDesktop _frozen;
     private readonly MonitorInfo _monitor;
 
+    private readonly System.Windows.Shapes.Rectangle _dim = new()
+    {
+        Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xAD, 0x0C, 0x08, 0x04)),
+    };
+    private readonly System.Windows.Shapes.Rectangle _border = new()
+    {
+        Stroke = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xB6, 0x27)),
+        StrokeThickness = 1,
+    };
+
     public MonitorInfo Monitor => _monitor;
     public Canvas Overlay => Layer;
 
     public event Action? Cancelled;
+    public event Action<int, int>? DragStarted;
+    public event Action<int, int>? PointerMoved;
+    public event Action? DragEnded;
 
     public OverlayWindow(FrozenDesktop frozen, MonitorInfo monitor)
     {
@@ -41,6 +54,23 @@ public partial class OverlayWindow : Window
         // otherwise the unfocused screens are dead ends.
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) Cancelled?.Invoke(); };
         MouseRightButtonUp += (_, _) => Cancelled?.Invoke();
+
+        MouseLeftButtonDown += (_, e) =>
+        {
+            var (vx, vy) = ToVirtualPixels(e.GetPosition(this));
+            DragStarted?.Invoke(vx, vy);
+            CaptureMouse();
+        };
+        MouseMove += (_, e) =>
+        {
+            var (vx, vy) = ToVirtualPixels(e.GetPosition(this));
+            PointerMoved?.Invoke(vx, vy);
+        };
+        MouseLeftButtonUp += (_, _) =>
+        {
+            ReleaseMouseCapture();
+            DragEnded?.Invoke();
+        };
 
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
@@ -213,6 +243,58 @@ public partial class OverlayWindow : Window
     public (int X, int Y) ToVirtualPixels(Point dipPoint) => (
         _monitor.Bounds.X + Dpi.DipToPhysical(dipPoint.X, _monitor.Scale),
         _monitor.Bounds.Y + Dpi.DipToPhysical(dipPoint.Y, _monitor.Scale));
+
+    /// <summary>Draws this monitor's slice of a selection that may span several monitors.</summary>
+    public void RenderSelection(PixelRect? selection)
+    {
+        if (_dim.Parent is null)
+        {
+            Layer.Children.Add(_dim);
+            Layer.Children.Add(_border);
+        }
+
+        // ActualWidth/ActualHeight are DIPs valid only after layout. Re-read them on
+        // every call rather than just when _dim is first added: the first
+        // RenderSelection can in principle land before this window's first layout
+        // pass has produced a non-zero size, which would otherwise wedge _dim's
+        // Width/Height at 0 forever (the add-guard above only runs once).
+        _dim.Width = ActualWidth;
+        _dim.Height = ActualHeight;
+
+        if (selection is not { } sel)
+        {
+            _dim.Opacity = 1;
+            _border.Visibility = Visibility.Collapsed;
+            _dim.Clip = null;
+            return;
+        }
+
+        var local = sel.Intersect(_monitor.Bounds);
+        if (local.IsEmpty)
+        {
+            _dim.Opacity = 1;
+            _dim.Clip = null;
+            _border.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var x = Dpi.PhysicalToDip(local.X - _monitor.Bounds.X, _monitor.Scale);
+        var y = Dpi.PhysicalToDip(local.Y - _monitor.Bounds.Y, _monitor.Scale);
+        var w = Dpi.PhysicalToDip(local.Width, _monitor.Scale);
+        var h = Dpi.PhysicalToDip(local.Height, _monitor.Scale);
+
+        // Punch the selection out of the dim layer with an even-odd geometry —
+        // the kept region stays at full brightness.
+        var outer = new RectangleGeometry(new Rect(0, 0, ActualWidth, ActualHeight));
+        var inner = new RectangleGeometry(new Rect(x, y, w, h));
+        _dim.Clip = new CombinedGeometry(GeometryCombineMode.Exclude, outer, inner);
+
+        Canvas.SetLeft(_border, x);
+        Canvas.SetTop(_border, y);
+        _border.Width = w;
+        _border.Height = h;
+        _border.Visibility = Visibility.Visible;
+    }
 
     public void ShowAt(bool activate)
     {

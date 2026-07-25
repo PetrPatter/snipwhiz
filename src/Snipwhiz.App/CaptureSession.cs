@@ -21,6 +21,7 @@ public sealed class CaptureSession : IDisposable
 
     public FrozenDesktop Frozen => _frozen;
     public IReadOnlyList<OverlayWindow> Overlays => _overlays;
+    public SelectionController Selection { get; private set; } = null!;
 
     public event Action<PixelRect>? Committed;
     public event Action? Cancelled;
@@ -58,6 +59,22 @@ public sealed class CaptureSession : IDisposable
                 overlay.Cancelled += Cancel;
                 _overlays.Add(overlay);
                 overlay.ShowAt(activate: monitor.DeviceName == active.DeviceName);
+            }
+
+            Selection = new SelectionController(this);
+            Selection.Changed += rect =>
+            {
+                foreach (var o in _overlays) o.RenderSelection(rect);
+            };
+
+            foreach (var overlay in _overlays)
+            {
+                overlay.DragStarted += (x, y) => Selection.BeginDrag(x, y);
+                overlay.PointerMoved += (x, y) => Selection.UpdateDrag(x, y);
+                overlay.DragEnded += () =>
+                {
+                    if (Selection.EndDrag() is { } rect) Commit(rect);
+                };
             }
 
             var designated = _overlays.First(o => o.Monitor.DeviceName == active.DeviceName);
