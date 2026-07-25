@@ -14,6 +14,10 @@ public class VirtualDesktopTests
     });
 
     [Fact]
+    public void FromMonitors_rejects_an_empty_monitor_list()
+        => Assert.Throws<ArgumentException>(() => VirtualDesktop.FromMonitors(Array.Empty<MonitorInfo>()));
+
+    [Fact]
     public void Bounds_is_the_union_and_may_have_a_negative_origin()
     {
         var d = MixedDpiNegativeOrigin();
