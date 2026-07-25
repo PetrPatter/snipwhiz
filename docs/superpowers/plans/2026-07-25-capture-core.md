@@ -234,7 +234,9 @@ public class DpiTests
     [Fact]
     public void DipToPhysical_rounds_half_away_from_zero()
     {
-        // 33.5 physical px at 150% is 22.333 DIP; round-tripping must not drift
+        // 67.0 DIP at 150% is exactly 100.5 physical px. Banker's rounding would
+        // give 100; away-from-zero gives 101. Half-pixel drift on a monitor edge
+        // is what makes a capture one row short.
         Assert.Equal(101, Dpi.DipToPhysical(67.0, 1.5));
     }
 
