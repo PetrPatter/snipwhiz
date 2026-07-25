@@ -22,7 +22,7 @@ Every task's requirements implicitly include this section.
 - **The frozen bitmap renders at exactly 1:1 physical pixels.** See Task 8.
 - **Zero new third-party dependencies for *capture*.** `System.Drawing.Common` (PNG encode) and `Microsoft.Data.Sqlite` are permitted and are the only additions beyond CsWin32/xUnit.
 - **`BitBlt` flags are `SRCCOPY | CAPTUREBLT`.** Without `CAPTUREBLT` the capture silently drops layered content (menu/tooltip shadows).
-- **Every GDI handle is wrapped in a `SafeHandle` and released in a `finally`.** This is a tray app that runs for weeks.
+- **No GDI handle is leaked on any path, including exceptions.** This is a tray app that runs for weeks. Method-scoped handles use `try`/`finally` with the correct teardown order (deselect the bitmap from the DC → delete the bitmap → delete the DC → release the screen DC); deleting a bitmap still selected into a DC is undefined behaviour. Any handle stored in a *field* — outliving a single method — must be `SafeHandle`-wrapped.
 - **Notifications are `NotifyIcon.ShowBalloonTip`, never toasts.** Toasts from unpackaged apps are silently dropped until the spec 3 installer exists.
 - **Clipboard before disk, always.** The clipboard is what the user is about to paste; it must not block on I/O.
 - **Default hotkeys are `Ctrl+Shift+1` (region) and `Ctrl+Shift+2` (fullscreen).** PrintScreen is opt-in only, with explicit consent.
