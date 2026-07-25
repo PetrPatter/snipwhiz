@@ -23,4 +23,9 @@
     <ProjectReference Include="..\..\src\Snipwhiz.Core\Snipwhiz.Core.csproj" />
   </ItemGroup>
 
+  <!-- Suppress transitive SQLite vulnerability (see Snipwhiz.Core.csproj) -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
 </Project>

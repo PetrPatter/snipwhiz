@@ -31,7 +31,14 @@ public sealed class CaptureStore : IDisposable
         Directory.CreateDirectory(Path.Combine(_root, relativeDir));
 
         var relativePath = Path.Combine(relativeDir, $"{id:D}.png");
-        File.WriteAllBytes(Path.Combine(_root, relativePath), PngEncoder.Encode(image.Bgra, image.Width, image.Height));
+        var absolutePath = Path.Combine(_root, relativePath);
+
+        // FileMode.CreateNew, not WriteAllBytes: a saved capture is immutable, so a
+        // colliding id must fail loudly rather than quietly destroy the earlier one.
+        using (var file = new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write))
+        {
+            file.Write(PngEncoder.Encode(image.Bgra, image.Width, image.Height));
+        }
 
         var record = new CaptureRecord(id, now, image.Width, image.Height, sourceApp, sourceTitle, relativePath);
         _db.Insert(record);

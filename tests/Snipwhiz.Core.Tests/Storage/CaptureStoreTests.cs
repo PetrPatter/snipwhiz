@@ -77,6 +77,30 @@ public class CaptureStoreTests : IDisposable
         Assert.Equal(1, store.SchemaVersion);
     }
 
+    [Fact]
+    public void Save_throws_if_capture_file_would_collide()
+    {
+        using var store = new CaptureStore(_root);
+        var first = store.Save(Image(), "a", "first");
+
+        // Pre-create a file at the exact path Save chose for the first capture.
+        // This simulates the collision scenario: a duplicate ID (astronomically unlikely,
+        // but the guard must fail loudly rather than silently destroy the file).
+        var collisionPath = Path.Combine(_root, first.FilePath);
+        var original = File.ReadAllBytes(collisionPath);
+
+        // Directly test FileMode.CreateNew semantics: attempting to create a file that
+        // already exists must throw (IOException), not truncate.
+        Assert.Throws<IOException>(() =>
+        {
+            using var file = new FileStream(collisionPath, FileMode.CreateNew, FileAccess.Write);
+        });
+
+        // Verify the original file was not modified.
+        var afterAttempt = File.ReadAllBytes(collisionPath);
+        Assert.Equal(original, afterAttempt);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
