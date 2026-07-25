@@ -1,0 +1,17 @@
+# Normalize to LF in the repo, check out native on Windows.
+# Without this, VS and Git disagree and diffs show whole files as changed.
+* text=auto
+
+*.cs      text diff=csharp
+*.csproj  text
+*.sln     text eol=crlf
+*.md      text
+*.json    text
+*.yml     text
+*.html    text
+*.css     text
+*.js      text
+
+*.png binary
+*.ico binary
+*.pfx binary
