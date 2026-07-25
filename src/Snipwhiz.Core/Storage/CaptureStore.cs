@@ -8,10 +8,17 @@ public sealed class CaptureStore : IDisposable
 {
     private readonly string _root;
     private readonly LibraryDb _db;
+    private readonly Func<Guid> _newId;
 
-    public CaptureStore(string root)
+    /// <param name="newId">
+    /// Seam for tests. Defaults to Guid.CreateVersion7 — time-ordered, which is
+    /// the only property the store needs. Injectable so the immutability guard
+    /// in Save can be proven rather than assumed.
+    /// </param>
+    public CaptureStore(string root, Func<Guid>? newId = null)
     {
         _root = root;
+        _newId = newId ?? Guid.CreateVersion7;
         Directory.CreateDirectory(_root);
         _db = new LibraryDb(Path.Combine(_root, "library.db"));
     }
@@ -23,8 +30,7 @@ public sealed class CaptureStore : IDisposable
 
     public CaptureRecord Save(CroppedImage image, string sourceApp, string sourceTitle)
     {
-        // UUIDv7 is time-ordered, which is the only property we need.
-        var id = Guid.CreateVersion7();
+        var id = _newId();
         var now = DateTimeOffset.UtcNow;
 
         var relativeDir = Path.Combine("captures", now.ToString("yyyy"), now.ToString("MM"));

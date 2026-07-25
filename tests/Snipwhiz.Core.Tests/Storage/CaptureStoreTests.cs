@@ -78,27 +78,19 @@ public class CaptureStoreTests : IDisposable
     }
 
     [Fact]
-    public void Save_throws_if_capture_file_would_collide()
+    public void Save_refuses_to_overwrite_an_existing_capture()
     {
-        using var store = new CaptureStore(_root);
-        var first = store.Save(Image(), "a", "first");
+        // A fixed id forces the second Save onto the first one's exact path.
+        var fixedId = Guid.CreateVersion7();
+        using var store = new CaptureStore(_root, () => fixedId);
 
-        // Pre-create a file at the exact path Save chose for the first capture.
-        // This simulates the collision scenario: a duplicate ID (astronomically unlikely,
-        // but the guard must fail loudly rather than silently destroy the file).
-        var collisionPath = Path.Combine(_root, first.FilePath);
-        var original = File.ReadAllBytes(collisionPath);
+        var first = store.Save(Image(), "app", "first");
+        var firstBytes = File.ReadAllBytes(Path.Combine(_root, first.FilePath));
 
-        // Directly test FileMode.CreateNew semantics: attempting to create a file that
-        // already exists must throw (IOException), not truncate.
-        Assert.Throws<IOException>(() =>
-        {
-            using var file = new FileStream(collisionPath, FileMode.CreateNew, FileAccess.Write);
-        });
+        Assert.Throws<IOException>(() => store.Save(Image(16, 8), "app", "second"));
 
-        // Verify the original file was not modified.
-        var afterAttempt = File.ReadAllBytes(collisionPath);
-        Assert.Equal(original, afterAttempt);
+        // The original capture is byte-for-byte intact.
+        Assert.Equal(firstBytes, File.ReadAllBytes(Path.Combine(_root, first.FilePath)));
     }
 
     public void Dispose()
