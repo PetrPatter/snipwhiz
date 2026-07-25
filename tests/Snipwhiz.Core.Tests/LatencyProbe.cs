@@ -39,6 +39,7 @@ public class LatencyProbe(ITestOutputHelper output)
         output.WriteLine($"displays   : {desktop.Monitors.Count}");
         output.WriteLine($"virtual    : {desktop.Bounds.Width}x{desktop.Bounds.Height} ({megapixels:F1} MP)");
         output.WriteLine($"scales     : {string.Join(", ", desktop.Monitors.Select(m => $"{m.Scale:P0}"))}");
+        output.WriteLine($"dpi aware : {(desktop.Monitors[0].Scale != 1.0 ? "yes (scaled display detected)" : "1.0 scale — verify this display really is at 100%")}");
         output.WriteLine($"median     : {median:F1} ms");
         output.WriteLine($"worst      : {worst:F1} ms");
 
