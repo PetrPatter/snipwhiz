@@ -31,3 +31,6 @@ BITMAPV5HEADER
 GetForegroundWindow
 GetWindowTextW
 GetWindowThreadProcessId
+RegisterHotKey
+UnregisterHotKey
+HOT_KEY_MODIFIERS
