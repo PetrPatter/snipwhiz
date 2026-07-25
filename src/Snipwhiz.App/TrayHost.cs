@@ -21,7 +21,7 @@ public sealed class TrayHost : IDisposable
 
     public event Action? RegionRequested;
     public event Action? FullscreenRequested;
-    public event Action? CancelRequested;
+    public event Action? CancelRequested;   // inert until Task 8 wires it to the overlay
     public event Action? ExitRequested;
 
     public TrayHost(Settings settings, string root)

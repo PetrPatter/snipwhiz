@@ -1,5 +1,6 @@
 using System.Windows;
 using Application = System.Windows.Application;
+using MessageBox = System.Windows.MessageBox;
 using Snipwhiz.Core;
 using Snipwhiz.Core.Capture;
 using Snipwhiz.Core.Geometry;
@@ -29,23 +30,53 @@ public partial class App : Application
             return;
         }
 
-        var settings = Settings.Load(_root);
-        _store = new CaptureStore(_root);
-        _pipeline = new CapturePipeline(_store);
-
-        _tray = new TrayHost(settings, _root);
-        _tray.FullscreenRequested += CaptureFullscreen;
-        _tray.RegionRequested += CaptureFullscreen;   // replaced by the overlay in Task 9
-        _tray.ExitRequested += Shutdown;
-
-        _hotkeys = new HotkeyService();
-        _hotkeys.Pressed += id =>
+        // Registered before the tray exists so it covers as much of startup as
+        // possible. A failed capture must not take the app down with it — the
+        // user would just find Snipwhiz gone with no explanation. Continuing
+        // after an unhandled exception can mask a bug, but for a tray utility
+        // the user expects to still be there tomorrow, dying silently is worse
+        // than continuing with a visible error. Deliberate tradeoff, not an
+        // oversight.
+        DispatcherUnhandledException += (_, ex) =>
         {
-            if (id is HotkeyId.Fullscreen or HotkeyId.Region) CaptureFullscreen();
+            _tray?.ShowBalloon("Capture failed", ex.Exception.Message, isError: true);
+            ex.Handled = true;
         };
 
-        RegisterHotkeys();
-        _tray.ShowBalloon("Snipwhiz is running", "Press Ctrl+Shift+2 to capture the screen.");
+        try
+        {
+            var settings = Settings.Load(_root);
+            _store = new CaptureStore(_root);
+            _pipeline = new CapturePipeline(_store);
+
+            _tray = new TrayHost(settings, _root);
+            _tray.FullscreenRequested += CaptureFullscreen;
+            _tray.RegionRequested += CaptureFullscreen;   // replaced by the overlay in Task 9
+            _tray.ExitRequested += Shutdown;
+
+            _hotkeys = new HotkeyService();
+            _hotkeys.Pressed += id =>
+            {
+                if (id is HotkeyId.Fullscreen or HotkeyId.Region) CaptureFullscreen();
+            };
+
+            RegisterHotkeys();
+            _tray.ShowBalloon("Snipwhiz is running", "Press Ctrl+Shift+2 to capture the screen.");
+        }
+        catch (Exception ex)
+        {
+            // Nothing may outlive a failed startup — a visible tray icon with no
+            // process behind it cannot be dismissed by the user.
+            _hotkeys?.Dispose();
+            _tray?.Dispose();
+            _store?.Dispose();
+
+            MessageBox.Show(
+                $"Snipwhiz could not start.\n\n{ex.Message}",
+                "Snipwhiz", MessageBoxButton.OK, MessageBoxImage.Error);
+
+            Shutdown(1);
+        }
     }
 
     private void RegisterHotkeys()
