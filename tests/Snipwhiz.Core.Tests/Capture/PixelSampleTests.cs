@@ -38,4 +38,14 @@ public class PixelSampleTests
     [Fact]
     public void SampleAt_outside_the_bounds_returns_black()
         => Assert.Equal((0, 0, 0), Build().SampleAt(10_000, 10_000));
+
+    [Fact]
+    public void SampleAt_does_not_confuse_the_red_and_green_channels()
+    {
+        // Sample where x != y, so R and G hold different values — the assertions
+        // above use x == y, where an R/G swap is undetectable.
+        var frozen = Build();
+        // virtual (-93, -46) is buffer (7, 4): R = 7, G = 4, B = 10
+        Assert.Equal((7, 4, 10), frozen.SampleAt(-93, -46));
+    }
 }

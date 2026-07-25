@@ -323,8 +323,10 @@ public partial class OverlayWindow : Window
         var x = Dpi.PhysicalToDip(virtualX - _monitor.Bounds.X, _monitor.Scale) + 18;
         var y = Dpi.PhysicalToDip(virtualY - _monitor.Bounds.Y, _monitor.Scale) + 18;
 
+        // 136/190 are the loupe's DIP footprint (width/height) — they mirror
+        // Loupe.xaml's own dimensions and must be kept in sync if that changes.
         if (x + 136 > ActualWidth) x -= 136 + 36;
-        if (y + 170 > ActualHeight) y -= 170 + 36;
+        if (y + 190 > ActualHeight) y -= 190 + 36;
 
         Canvas.SetLeft(_loupe, Math.Max(4, x));
         Canvas.SetTop(_loupe, Math.Max(4, y));
