@@ -14,6 +14,7 @@ public sealed class LibraryDb : IDisposable
         {
             DataSource = dbPath,
             Mode = SqliteOpenMode.ReadWriteCreate,
+            Pooling = false,
         }.ToString());
         _connection.Open();
         Migrate();
