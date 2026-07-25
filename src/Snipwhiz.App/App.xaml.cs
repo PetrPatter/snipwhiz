@@ -103,7 +103,11 @@ public partial class App : Application
 
         if (!PrintScreenTakeover.IsSnippingToolBound())
         {
-            // Nothing to take over — just claim it.
+            // Nothing to take over — claim it directly. Mark the prompt answered even
+            // though no prompt was shown: this branch must not re-run on every startup,
+            // or a user who was never asked gets an error balloon forever when another
+            // app holds the key.
+            settings.PrintScreenPromptAnswered = true;
             TryClaimPrintScreen(settings);
             return;
         }
@@ -122,10 +126,12 @@ public partial class App : Application
         if (answer == MessageBoxResult.Yes)
         {
             PrintScreenTakeover.Release();
-            TryClaimPrintScreen(settings);
+            TryClaimPrintScreen(settings);   // saves settings, including PrintScreenPromptAnswered
         }
-
-        settings.Save(_root);
+        else
+        {
+            settings.Save(_root);
+        }
     }
 
     private void TryClaimPrintScreen(Settings settings)
