@@ -62,8 +62,18 @@ public sealed class CaptureSession : IDisposable
             }
 
             Selection = new SelectionController(this);
+
+            // Before the first real BeginDrag, every overlay is showing the plain
+            // frozen screenshot with no dim layer added at all — RenderSelection has
+            // never run on it. Only once a drag has actually started (Current becomes
+            // non-null, or is null because BeginDrag was called) is there a selection
+            // render in flight that a later DPI change (NeedsRedraw, below) needs to
+            // keep in sync. Guarding on this stops a DPI event that lands before any
+            // drag from prematurely dimming an overlay the user hasn't interacted with.
+            var selectionEngaged = false;
             Selection.Changed += rect =>
             {
+                selectionEngaged = true;
                 foreach (var o in _overlays) o.RenderSelection(rect);
             };
 
@@ -74,6 +84,10 @@ public sealed class CaptureSession : IDisposable
                 overlay.DragEnded += () =>
                 {
                     if (Selection.EndDrag() is { } rect) Commit(rect);
+                };
+                overlay.NeedsRedraw += () =>
+                {
+                    if (selectionEngaged) overlay.RenderSelection(Selection.Current);
                 };
             }
 

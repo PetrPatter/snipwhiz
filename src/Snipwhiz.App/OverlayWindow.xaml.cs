@@ -43,6 +43,7 @@ public partial class OverlayWindow : Window
     public event Action<int, int>? DragStarted;
     public event Action<int, int>? PointerMoved;
     public event Action? DragEnded;
+    public event Action? NeedsRedraw;
 
     public OverlayWindow(FrozenDesktop frozen, MonitorInfo monitor)
     {
@@ -177,6 +178,14 @@ public partial class OverlayWindow : Window
                     return;
                 }
             }
+
+            // A DPI change mid-session (this method also runs from WM_DPICHANGED,
+            // not just the initial Loaded) can leave the dim/border geometry sized
+            // against the pre-change ActualWidth/ActualHeight. Ask whoever owns the
+            // selection to re-render against our now-current size — RenderSelection
+            // itself re-reads ActualWidth/ActualHeight on every call, so this is
+            // safe to invoke at any time.
+            NeedsRedraw?.Invoke();
         }
         catch (Exception)
         {
