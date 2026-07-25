@@ -75,7 +75,7 @@ Snipwhiz.App  (WPF, net10.0-windows10.0.22621.0)
 
               ▲ depends on ▼
 
-Snipwhiz.Core  (no WPF reference)
+Snipwhiz.Core  (no WPF; see note on WinForms below)
   Geometry/   VirtualDesktop · MonitorInfo · coordinate conversion   ← unit tested
   Capture/    DesktopGrabber (BitBlt) → FrozenDesktop
   Hotkeys/    HotkeyService (message-only window)
@@ -87,9 +87,23 @@ Snipwhiz.Core  (no WPF reference)
 without a desktop session." That reason was false — xUnit can reference a
 WPF-targeted library and run pure static functions headlessly; only
 `Dispatcher`/`Window` instantiation needs a session. The split is kept for
-namespace discipline and to keep a UI-framework dependency out of the layer that
-will later be shared with a WebView2 host, which is a real but much smaller
-benefit than claimed.
+namespace discipline and to keep **WPF** out of the layer later shared with a
+WebView2 host, which is a real but much smaller benefit than claimed.
+
+**Core does reference WinForms** (`UseWindowsForms`), discovered during
+implementation. `HotkeyService` needs a message-only window to receive
+`WM_HOTKEY`, and `System.Windows.Forms.NativeWindow` is the in-box way to get
+one with correct `WndProc` marshalling. The alternative is ~40 lines of raw
+`CreateWindowEx` plus a manually lifetime-managed `WndProc` delegate — more code
+and easier to get wrong, for no benefit on a Windows-only product.
+
+Consequences, recorded so this is a decision rather than a surprise:
+
+- Core is not usable headlessly or cross-platform. Neither is required.
+- `System.Drawing.Common` no longer needs an explicit `PackageReference` in Core;
+  WinForms supplies it. `PngEncoder` is its only consumer.
+- **WPF is still absent from Core**, which is the part that actually matters for
+  the spec 2 WebView2 host.
 
 **Tray:** WinForms `NotifyIcon` via `<UseWindowsForms>true</UseWindowsForms>`.
 In-box, zero dependencies, and its `ShowBalloonTip` solves §6's notification
