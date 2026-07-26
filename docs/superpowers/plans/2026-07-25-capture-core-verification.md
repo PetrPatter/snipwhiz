@@ -57,7 +57,7 @@ Run on 2026-07-26 against the branch as merged.
 | 9 | Menu/tooltip **shadows** appear in the capture | Open a right-click menu, capture a region including its drop shadow. Proves `CAPTUREBLT` (§4.4) | **PASS** |
 | 10 | **Paste into Word, Paint, Chrome and Slack** — no black or blue backgrounds | Capture, then `Ctrl+V` into each. This is the defect the hand-built 3-format clipboard payload exists to prevent (§4.10) | **PASS** — all four |
 | 13 | Overlay opened over an **elevated** foreground window → aborts cleanly | Focus an admin PowerShell, press `Ctrl+Shift+1` | **PASS** |
-| 15 | **Autostart survives a reboot** | Tray → "Start with Windows", reboot, confirm the icon returns | **NOT RUN** — machine not rebooted. The registry write itself is covered by Task 11; what is unverified is only that Windows honours it across a boot |
+| 15 | **Autostart survives a reboot** | Tray → "Start with Windows", reboot, confirm the icon returns | **PARTIAL** — the first reboot did not autostart because the toggle had never been switched on (`Autostart: false`, no Run value — consistent, not a defect). After toggling, `HKCU\...\Run\Snipwhiz` holds the correct quoted path to the real exe. The registry write is verified; **Windows honouring it across a boot is still unconfirmed** |
 | 17 | **Soak:** repeated captures, GDI handle count *and* managed working set stay flat | Task Manager → Details → add "GDI objects" and "Memory". Capture repeatedly over a session | **PASS** |
 
 ### Known limitations to confirm rather than fix
