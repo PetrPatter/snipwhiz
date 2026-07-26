@@ -4,7 +4,7 @@ namespace Snipwhiz.Core.Storage;
 
 public sealed class LibraryDb : IDisposable
 {
-    private const int CurrentSchemaVersion = 1;
+    private const int CurrentSchemaVersion = 2;
     private readonly SqliteConnection _connection;
 
     public LibraryDb(string dbPath)
@@ -30,30 +30,59 @@ public sealed class LibraryDb : IDisposable
         }
     }
 
+    /// <summary>
+    /// Stepwise, one block per version, stamped once at the end inside the
+    /// transaction. The earlier single-script form hard-coded
+    /// <c>user_version = 1</c>, so raising <see cref="CurrentSchemaVersion"/>
+    /// left every database — including brand new ones — stamped 1 and
+    /// re-migrating on every open.
+    /// </summary>
     private void Migrate()
     {
-        using var wal = _connection.CreateCommand();
-        wal.CommandText = "PRAGMA journal_mode=WAL;";
-        wal.ExecuteNonQuery();
+        using (var wal = _connection.CreateCommand())
+        {
+            wal.CommandText = "PRAGMA journal_mode=WAL;";
+            wal.ExecuteNonQuery();
+        }
 
-        if (SchemaVersion >= CurrentSchemaVersion) return;
+        var version = SchemaVersion;
+        if (version >= CurrentSchemaVersion) return;
 
+        using var tx = _connection.BeginTransaction();
         using var cmd = _connection.CreateCommand();
-        // Spec 2 adds columns; ALTER TABLE ADD COLUMN is free in SQLite, so
-        // nothing is pre-built for it here.
-        cmd.CommandText = """
-            CREATE TABLE IF NOT EXISTS captures (
-                id           TEXT    PRIMARY KEY,
-                created_utc  INTEGER NOT NULL,
-                width        INTEGER NOT NULL,
-                height       INTEGER NOT NULL,
-                source_app   TEXT    NOT NULL,
-                source_title TEXT    NOT NULL,
-                file_path    TEXT    NOT NULL
-            );
-            PRAGMA user_version = 1;
-            """;
+        cmd.Transaction = tx;
+
+        if (version < 1)
+        {
+            cmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS captures (
+                    id           TEXT    PRIMARY KEY,
+                    created_utc  INTEGER NOT NULL,
+                    width        INTEGER NOT NULL,
+                    height       INTEGER NOT NULL,
+                    source_app   TEXT    NOT NULL,
+                    source_title TEXT    NOT NULL,
+                    file_path    TEXT    NOT NULL
+                );
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        if (version < 2)
+        {
+            cmd.CommandText = """
+                CREATE INDEX IF NOT EXISTS idx_captures_created
+                    ON captures(created_utc DESC, id DESC);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        // PRAGMA takes a literal, not a parameter. CurrentSchemaVersion is a
+        // compile-time constant, so there is no injection surface here.
+        cmd.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
         cmd.ExecuteNonQuery();
+
+        tx.Commit();
     }
 
     public void Insert(CaptureRecord r)
