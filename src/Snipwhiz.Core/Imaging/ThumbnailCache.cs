@@ -98,7 +98,14 @@ public sealed class ThumbnailCache(CaptureStore store) : IDisposable
         // Write beside the target and move into place: a cancellation or crash
         // part-way must never leave a truncated file that later passes the SOI
         // check and renders as a torn thumbnail.
-        var tempPath = thumbPath + ".tmp";
+        //
+        // The temp name is unique per attempt, not just per capture. Two tiles can
+        // request the same thumbnail concurrently — routine when a recycled
+        // container rebinds during a fast scroll — and a shared temp name has them
+        // writing the same file at once, which GDI+ surfaces as an opaque
+        // "generic error". The final move is atomic, so the duplicate work is
+        // wasted but harmless; a colliding temp file is not.
+        var tempPath = $"{thumbPath}.{Guid.NewGuid():N}.tmp";
 
         try
         {

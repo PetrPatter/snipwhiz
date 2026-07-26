@@ -7,6 +7,7 @@ using Snipwhiz.Core;
 using Snipwhiz.Core.Capture;
 using Snipwhiz.Core.Geometry;
 using Snipwhiz.Core.Hotkeys;
+using Snipwhiz.Core.Imaging;
 using Snipwhiz.Core.Storage;
 
 namespace Snipwhiz.App;
@@ -108,9 +109,12 @@ public partial class App : Application
 
     private LibraryWindow? _library;
 
+    private ThumbnailCache? _thumbnails;
+
     private void ShowLibrary()
     {
-        _library ??= new LibraryWindow(_store!);
+        _thumbnails ??= new ThumbnailCache(_store!);
+        _library ??= new LibraryWindow(_store!, _thumbnails);
         _library.Reveal();
     }
 

@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using Snipwhiz.Core.Imaging;
 using Snipwhiz.Core.Storage;
 
 namespace Snipwhiz.App.Library;
@@ -13,22 +15,59 @@ namespace Snipwhiz.App.Library;
 /// </summary>
 public partial class LibraryWindow : Window
 {
-    private readonly CaptureStore _store;
+    // Must match CaptureTile's Width plus its right margin, or the column count
+    // is computed against a tile width that does not exist.
+    private const double TileStride = 252 + 16;
 
-    public LibraryWindow(CaptureStore store)
+    private readonly CaptureStore _store;
+    private readonly LibraryViewModel _model;
+
+    public LibraryWindow(CaptureStore store, ThumbnailCache thumbnails)
     {
         _store = store;
         InitializeComponent();
 
+        _model = new LibraryViewModel(store, thumbnails);
+        DataContext = _model;
+
         SourceInitialized += (_, _) =>
         {
-            // The XAML leaves Background unset so the backdrop can show through.
-            // If the compositor refuses it, that same unset background would leave
-            // a see-through window, so the flat fallback is applied here.
+            // The XAML sets Background to Transparent so the backdrop can show
+            // through. If the compositor refuses it that would leave a see-through
+            // window, so the flat fallback is applied here.
             if (!Mica.TryApply(new WindowInteropHelper(this).Handle))
                 Background = (System.Windows.Media.Brush)FindResource("Surface");
         };
-        Loaded += (_, _) => RefreshFooter();
+
+        Loaded += (_, _) =>
+        {
+            RowsHost.AddHandler(ScrollViewer.ScrollChangedEvent,
+                new ScrollChangedEventHandler(OnScrollChanged));
+            ApplyColumns();
+            _model.Reload();
+            RefreshFooter();
+        };
+
+        SizeChanged += (_, _) => ApplyColumns();
+    }
+
+    private void ApplyColumns()
+    {
+        var available = RowsHost.ActualWidth > 0 ? RowsHost.ActualWidth : ActualWidth - 56;
+        _model.SetColumns((int)Math.Floor((available + 16) / TileStride));
+    }
+
+    /// <summary>
+    /// Fetches the next page as the end comes into view. The view model guards
+    /// re-entrancy — a drag of the scrollbar raises this continuously.
+    /// </summary>
+    private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.ViewportHeight <= 0) return;
+        var remaining = e.ExtentHeight - (e.VerticalOffset + e.ViewportHeight);
+        if (remaining <= e.ViewportHeight) _model.LoadNextPage();
+
+        Diagnostics.GridVerification.Sample(RowsHost, _model.Count);
     }
 
     /// <summary>Shows or brings forward the single instance.</summary>

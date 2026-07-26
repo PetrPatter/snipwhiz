@@ -1,0 +1,41 @@
+<UserControl x:Class="Snipwhiz.App.Library.CaptureTile"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="252" Margin="0,0,16,16">
+
+    <Border Background="#26241F" CornerRadius="10" Padding="0" ClipToBounds="True">
+        <StackPanel>
+            <!-- Fixed box so rows have a uniform height; the panel virtualizes
+                 by row, and ragged row heights make its scroll estimates wrong. -->
+            <Grid Height="150" Background="#141312">
+                <Image x:Name="Thumb"
+                       Source="{Binding Thumbnail}"
+                       Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                <TextBlock Text="Unavailable"
+                           Foreground="#8F8A80" FontSize="12"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding IsMissing,
+                                        Converter={StaticResource BoolToVisibility}}"/>
+            </Grid>
+
+            <Grid Margin="12,9,12,11">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Caption}"
+                           Foreground="#F5F2EC" FontSize="12"
+                           TextTrimming="CharacterEllipsis"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding TakenAt}"
+                           Foreground="#8F8A80" FontSize="11"
+                           Margin="8,0,0,0"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>
