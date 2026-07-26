@@ -46,19 +46,19 @@ $env:SNIPWHIZ_VERIFY_BREAK_SCALE = "1"
 
 ---
 
-## Needs a human at the machine
+## Verified by the user at the machine
 
-These are the ones I could not do. Fill in the result column.
+Run on 2026-07-26 against the branch as merged.
 
 | # | Check | How | Result |
 |---|-------|-----|--------|
-| 1 | Single monitor, 100%, laptop panel — full loop works | Unplug the external display, set the laptop to 100%, capture a region | |
-| 2 | Same panel with **HDR on** — note washed-out or desaturated output | Settings → System → Display → HDR on, then capture | |
-| 9 | Menu/tooltip **shadows** appear in the capture | Open a right-click menu, capture a region including its drop shadow. Proves `CAPTUREBLT` (§4.4) | |
-| 10 | **Paste into Word, Paint, Chrome and Slack** — no black or blue backgrounds | Capture, then `Ctrl+V` into each. This is the defect the hand-built 3-format clipboard payload exists to prevent (§4.10) | |
-| 13 | Overlay opened over an **elevated** foreground window → aborts cleanly | Focus an admin PowerShell, press `Ctrl+Shift+1` | |
-| 15 | **Autostart survives a reboot** | Tray → "Start with Windows", reboot, confirm the icon returns | |
-| 17 | **Soak:** repeated captures, GDI handle count *and* managed working set stay flat | Task Manager → Details → add "GDI objects" and "Memory". Capture repeatedly over a session | |
+| 1 | Single monitor, 100%, laptop panel — full loop works | Unplug the external display, set the laptop to 100%, capture a region | **PASS** |
+| 2 | Same panel with **HDR on** — note washed-out or desaturated output | Settings → System → Display → HDR on, then capture | **PASS** |
+| 9 | Menu/tooltip **shadows** appear in the capture | Open a right-click menu, capture a region including its drop shadow. Proves `CAPTUREBLT` (§4.4) | **PASS** |
+| 10 | **Paste into Word, Paint, Chrome and Slack** — no black or blue backgrounds | Capture, then `Ctrl+V` into each. This is the defect the hand-built 3-format clipboard payload exists to prevent (§4.10) | **PASS** — all four |
+| 13 | Overlay opened over an **elevated** foreground window → aborts cleanly | Focus an admin PowerShell, press `Ctrl+Shift+1` | **PASS** |
+| 15 | **Autostart survives a reboot** | Tray → "Start with Windows", reboot, confirm the icon returns | **NOT RUN** — machine not rebooted. The registry write itself is covered by Task 11; what is unverified is only that Windows honours it across a boot |
+| 17 | **Soak:** repeated captures, GDI handle count *and* managed working set stay flat | Task Manager → Details → add "GDI objects" and "Memory". Capture repeatedly over a session | **PASS** |
 
 ### Known limitations to confirm rather than fix
 
