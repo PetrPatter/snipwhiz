@@ -84,6 +84,23 @@ public sealed class LibraryViewModel(CaptureStore store, ThumbnailCache cache)
         Rebuild();
     }
 
+    /// <summary>
+    /// Puts a record back where it belongs rather than at the top — an undone
+    /// delete should restore the grid, not reorder it.
+    /// </summary>
+    public void Restore(CaptureRecord record)
+    {
+        if (_records.Any(r => r.Id == record.Id)) return;
+
+        var index = _records.FindIndex(r =>
+            r.CreatedUtc < record.CreatedUtc ||
+            (r.CreatedUtc == record.CreatedUtc && string.CompareOrdinal(
+                r.Id.ToString("D"), record.Id.ToString("D")) < 0));
+
+        _records.Insert(index < 0 ? _records.Count : index, record);
+        Rebuild();
+    }
+
     private void Rebuild()
     {
         var target = LibraryLayout.Build(_records, _columns, DateTimeOffset.Now)

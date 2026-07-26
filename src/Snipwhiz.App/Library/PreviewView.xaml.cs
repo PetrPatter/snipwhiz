@@ -22,6 +22,7 @@ public partial class PreviewView : System.Windows.Controls.UserControl
 
     public event Action? Dismissed;
     public event Action<CaptureRecord>? CopyRequested;
+    public event Action<CaptureRecord>? DeleteRequested;
 
     public PreviewView() : this(null!) { }   // designer only
 
@@ -32,6 +33,14 @@ public partial class PreviewView : System.Windows.Controls.UserControl
 
         BackButton.Click += (_, _) => Close();
         CopyButton.Click += (_, _) => Copy();
+        DeleteButton.Click += (_, _) =>
+        {
+            // Captured before Close clears it — the handler runs after.
+            var record = _record;
+            if (record is null) return;
+            Close();
+            DeleteRequested?.Invoke(record);
+        };
 
         // Only a click on the empty surface itself, not one that bubbled up from
         // the image — otherwise clicking the picture dismisses it.

@@ -31,11 +31,19 @@
                            Foreground="#8F8A80" FontSize="11" Margin="0,2,0,0"/>
             </StackPanel>
 
-            <Button x:Name="CopyButton" Grid.Column="2"
-                    Content="Copy"
-                    Background="#E8833A" BorderThickness="0"
-                    Foreground="#1C1B1A" FontSize="13" FontWeight="SemiBold"
-                    Padding="18,7" Cursor="Hand"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="DeleteButton"
+                        Content="Delete"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="#8F8A80" FontSize="13"
+                        Padding="14,7" Margin="0,0,8,0" Cursor="Hand"/>
+
+                <Button x:Name="CopyButton"
+                        Content="Copy"
+                        Background="#E8833A" BorderThickness="0"
+                        Foreground="#1C1B1A" FontSize="13" FontWeight="SemiBold"
+                        Padding="18,7" Cursor="Hand"/>
+            </StackPanel>
         </Grid>
 
         <!-- Image surface. Clicking the empty space around the image dismisses. -->

@@ -1,9 +1,11 @@
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Snipwhiz.Core.Imaging;
 using Snipwhiz.Core.Storage;
 
@@ -21,11 +23,13 @@ public partial class LibraryWindow : Window
     private const double TileStride = 252 + 16;
 
     private readonly CaptureStore _store;
+    private readonly ThumbnailCache _thumbnails;
     private readonly LibraryViewModel _model;
 
     public LibraryWindow(CaptureStore store, ThumbnailCache thumbnails)
     {
         _store = store;
+        _thumbnails = thumbnails;
         InitializeComponent();
 
         _model = new LibraryViewModel(store, thumbnails);
@@ -33,7 +37,10 @@ public partial class LibraryWindow : Window
 
         _preview = new PreviewView(store);
         _preview.Dismissed += () => RootContent.Visibility = Visibility.Visible;
+        _preview.DeleteRequested += Delete;
         PreviewHost.Content = _preview;
+
+        UndoButton.Click += (_, _) => UndoLastDelete();
 
         // One handler for every tile rather than plumbing a click event through
         // the templates: find the tile the click landed in and open it.
@@ -66,6 +73,98 @@ public partial class LibraryWindow : Window
 
     private readonly PreviewView _preview;
     private ScrollViewer? _scroller;
+
+    private static readonly TimeSpan UndoWindow = TimeSpan.FromSeconds(5);
+
+    private sealed record PendingDelete(CaptureRecord Record, DispatcherTimer Timer);
+
+    private readonly List<PendingDelete> _pendingDeletes = [];
+
+    /// <summary>
+    /// Removes the row immediately and the files only once the undo window has
+    /// closed.
+    ///
+    /// The order is the whole point. Deleting the file up front would make undo a
+    /// lie: the row would come back pointing at a PNG that no longer exists, the
+    /// tile would reappear, and the capture would be gone. Row-first also means a
+    /// crash between the two steps leaves an orphaned file — invisible and
+    /// harmless — rather than an orphaned row, which is a visibly broken tile.
+    /// </summary>
+    private void Delete(CaptureRecord record)
+    {
+        _store.Delete(record.Id);
+        _model.Remove(record.Id);
+
+        var timer = new DispatcherTimer { Interval = UndoWindow };
+        var entry = new PendingDelete(record, timer);
+        timer.Tick += (_, _) => CommitDelete(entry);
+
+        _pendingDeletes.Add(entry);
+        timer.Start();
+
+        ShowUndoToast();
+        RefreshFooter();
+    }
+
+    /// <summary>The undo window has closed. Now, and only now, the files go.</summary>
+    private void CommitDelete(PendingDelete entry)
+    {
+        entry.Timer.Stop();
+        _pendingDeletes.Remove(entry);
+
+        TryDeleteFile(_store.ResolvePath(entry.Record));
+        _thumbnails.Remove(entry.Record.Id);
+
+        ShowUndoToast();
+    }
+
+    private void UndoLastDelete()
+    {
+        if (_pendingDeletes.Count == 0) return;
+
+        var entry = _pendingDeletes[^1];
+        entry.Timer.Stop();
+        _pendingDeletes.RemoveAt(_pendingDeletes.Count - 1);
+
+        // The file was never touched, so re-inserting the row is a complete undo.
+        _store.Insert(entry.Record);
+        _model.Restore(entry.Record);
+
+        ShowUndoToast();
+        RefreshFooter();
+    }
+
+    /// <summary>
+    /// Runs every outstanding deletion now. Called when the window hides and again
+    /// on exit: a pending timer that never fires would leave the row gone and the
+    /// file behind forever.
+    /// </summary>
+    public void FlushPendingDeletes()
+    {
+        foreach (var entry in _pendingDeletes.ToArray()) CommitDelete(entry);
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        // Best-effort by design: the row is already gone, so a file that refuses
+        // to delete is a stale file, not a failure worth interrupting the user for.
+        try { File.Delete(path); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    private void ShowUndoToast()
+    {
+        if (_pendingDeletes.Count == 0)
+        {
+            UndoToast.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        UndoText.Text = _pendingDeletes.Count == 1
+            ? "Capture deleted"
+            : $"{_pendingDeletes.Count} captures deleted";
+        UndoToast.Visibility = Visibility.Visible;
+    }
 
     private void OnGridClick(object sender, MouseButtonEventArgs e)
     {
@@ -147,7 +246,7 @@ public partial class LibraryWindow : Window
         {
             // Esc backs out one level: preview first, then the window.
             if (_preview.IsOpen) _preview.Close();
-            else Hide();
+            else { FlushPendingDeletes(); Hide(); }
             e.Handled = true;
             return;
         }
@@ -173,7 +272,15 @@ public partial class LibraryWindow : Window
     // its grid, re-query, and re-fetch every thumbnail on the next open.
     protected override void OnClosing(CancelEventArgs e)
     {
-        if (AllowClose) return;
+        if (AllowClose)
+        {
+            FlushPendingDeletes();
+            return;
+        }
+
+        // Dismissing the window ends the undo window: the toast is gone, so
+        // leaving the files alive would strand them with no row referencing them.
+        FlushPendingDeletes();
         e.Cancel = true;
         Hide();
     }
