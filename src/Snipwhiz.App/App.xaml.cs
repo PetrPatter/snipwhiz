@@ -139,7 +139,7 @@ public partial class App : Application
     {
         if (!_libraryHiddenForCapture) return;
         _libraryHiddenForCapture = false;
-        _library?.Reveal();
+        _library?.Reveal(activate: false);
     }
 
     private void OfferPrintScreenTakeover(Settings settings)

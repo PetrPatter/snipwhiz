@@ -20,16 +20,29 @@ public partial class LibraryWindow : Window
         _store = store;
         InitializeComponent();
 
-        SourceInitialized += (_, _) => Mica.TryApply(new WindowInteropHelper(this).Handle);
+        SourceInitialized += (_, _) =>
+        {
+            // The XAML leaves Background unset so the backdrop can show through.
+            // If the compositor refuses it, that same unset background would leave
+            // a see-through window, so the flat fallback is applied here.
+            if (!Mica.TryApply(new WindowInteropHelper(this).Handle))
+                Background = (System.Windows.Media.Brush)FindResource("Surface");
+        };
         Loaded += (_, _) => RefreshFooter();
     }
 
     /// <summary>Shows or brings forward the single instance.</summary>
-    public void Reveal()
+    /// <param name="activate">
+    /// False when restoring after a capture: the window comes back where it was,
+    /// but whatever the user was actually working in keeps keyboard focus. Taking
+    /// focus is right when they asked for the library and wrong when they only
+    /// asked for a screenshot.
+    /// </param>
+    public void Reveal(bool activate = true)
     {
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-        Activate();
+        if (activate) Activate();
         RefreshFooter();
     }
 

@@ -5,9 +5,19 @@
         Width="1100" Height="720"
         MinWidth="620" MinHeight="420"
         WindowStartupLocation="CenterScreen"
-        Background="#1C1B1A"
         TextOptions.TextFormattingMode="Ideal"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+
+        Background="Transparent">
+
+    <!--
+      Transparent, and explicitly so. An opaque brush is painted across the whole
+      client area and hides the Mica backdrop, leaving it visible only in the
+      caption. Omitting the attribute is not the fix either: a Window's default
+      Background is SystemColors.WindowBrush, so leaving it unset paints white.
+      The flat fallback is applied in code, but only when the compositor actually
+      refuses the backdrop.
+    -->
 
     <Window.Resources>
         <SolidColorBrush x:Key="Surface" Color="#1C1B1A"/>
@@ -17,6 +27,12 @@
         <SolidColorBrush x:Key="Accent" Color="#E8833A"/>
     </Window.Resources>
 
+    <!--
+      Mica tints with the desktop wallpaper, so unmodified it makes text contrast
+      a function of whatever image the user happens to have set. This scrim keeps
+      the surface reliably dark while still letting the backdrop read through it.
+    -->
+    <Grid Background="#B21C1B1A">
     <Grid Margin="28,20,28,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -64,5 +80,6 @@
                    Grid.Row="2" Margin="0,16,0,0"
                    Foreground="{StaticResource InkMuted}"
                    FontSize="12"/>
+    </Grid>
     </Grid>
 </Window>
