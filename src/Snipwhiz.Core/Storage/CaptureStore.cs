@@ -25,6 +25,15 @@ public sealed class CaptureStore : IDisposable
 
     public int SchemaVersion => _db.SchemaVersion;
 
+    public string Root => _root;
+
+    /// <summary>
+    /// <see cref="CaptureRecord.FilePath"/> is relative to the store root so the
+    /// folder stays movable, which means nothing outside this class can open a
+    /// capture without this.
+    /// </summary>
+    public string ResolvePath(CaptureRecord record) => Path.Combine(_root, record.FilePath);
+
     public static string DefaultRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Snipwhiz");
 
