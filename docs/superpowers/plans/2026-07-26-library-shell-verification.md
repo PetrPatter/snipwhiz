@@ -55,16 +55,40 @@ thousand synthetic captures into a real library.
 
 ---
 
+| # | Check | Result |
+|---|-------|--------|
+| 1b | Paste into **Paint and Chrome** | **PASS** (Slack not tried) |
+| 1c | Preview shows the full PNG, not an upscaled thumbnail | **PASS** |
+| 1d | Preview a capture smaller than the window, 125% panel | **PASS** — pixel-sharp at its true size |
+| 3 | Capture while the library is open → new tile at top of Today | **PASS** |
+| 9 | Delete a PNG in Explorer, then use its tile | **PASS** |
+| 11 | Copy, delete, let the toast expire, then paste | **FAILED, then fixed** — see below |
+
+### Check 11: a regression the file-publishing fix introduced
+
+Pasting a deleted capture reported *"error occurred while importing this file"*.
+
+Spec 2a §6.3 predicted this would pass, reasoning that the clipboard holds a copy
+of the bytes rather than a file reference. That was true when it was written, and
+publishing `CF_HDROP` made it false: consumers that prefer the file — Paint among
+them — followed the path to a file that had just been deleted, while the pixels
+sat unused in the same clipboard.
+
+Committing a deletion now checks whether the clipboard still names that exact
+path and, if so, republishes the capture as pixels only before removing the file.
+Narrow on purpose: a clipboard the user has since filled with something else is
+left alone.
+
+**This is the cost of the ordering change made for `CF_HDROP`, showing up in a
+place the spec had already reasoned about and got wrong.** The reasoning was
+sound when written; the premise moved underneath it.
+
 ## Still outstanding
 
 | # | Check | Why it needs a human |
 |---|-------|----------------------|
-| 1b | Paste into **Paint, Chrome and Slack** | Word is confirmed; the other three are not |
-| 1d | Preview a capture **smaller than the window** on the 125% panel | Must be pixel-sharp at its true size, not upscaled. The DIP-vs-physical trap |
-| 1c | Preview shows the full PNG, not an upscaled thumbnail | Visual |
-| 3 | Capture while the library is open → new tile at the top of Today | Live insert |
-| 9 | Delete a PNG in Explorer, then use its tile | Missing-file placeholder and "Remove from library" |
-| 11 | Copy from library, delete it, let the toast expire, then paste | The clipboard holds bytes, so the paste should still work |
+| 1b | Paste into **Slack** | Paint and Chrome confirmed |
+| 11 | Re-run after the fix above | The failing case must be seen passing |
 | 17 | Soak: repeated open/scroll/capture/delete; GDI handles and working set flat | Runs for weeks |
 
 ---

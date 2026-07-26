@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -7,6 +8,7 @@ using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Snipwhiz.Core.Clipboard;
 using Snipwhiz.Core.Imaging;
 using Snipwhiz.Core.Storage;
 
@@ -162,7 +164,9 @@ public partial class LibraryWindow : Window
         entry.Timer.Stop();
         _pendingDeletes.Remove(entry);
 
-        TryDeleteFile(_store.ResolvePath(entry.Record));
+        var path = _store.ResolvePath(entry.Record);
+        DropFileReferenceFromClipboard(path);
+        TryDeleteFile(path);
         _thumbnails.Remove(entry.Record.Id);
 
         ShowUndoToast();
@@ -192,6 +196,45 @@ public partial class LibraryWindow : Window
     public void FlushPendingDeletes()
     {
         foreach (var entry in _pendingDeletes.ToArray()) CommitDelete(entry);
+    }
+
+    /// <summary>
+    /// If the clipboard is currently advertising the file we are about to delete,
+    /// republish the same capture as pixels only.
+    ///
+    /// Copying a capture publishes both the image and the file (CF_HDROP). Apps
+    /// that prefer the file — Paint among them — then try to import a path that no
+    /// longer exists and report a file error, even though the pixels are sitting
+    /// right there in the same clipboard. Spec 2a §6.3 assumed the clipboard held
+    /// only bytes and that deletion could not affect a pending paste; publishing
+    /// the file made that untrue.
+    ///
+    /// Deliberately narrow: it only acts when the clipboard still names this exact
+    /// path, so a clipboard the user has since filled with something else is left
+    /// alone.
+    /// </summary>
+    private static void DropFileReferenceFromClipboard(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+            if (!System.Windows.Forms.Clipboard.ContainsFileDropList()) return;
+
+            var advertised = System.Windows.Forms.Clipboard.GetFileDropList()
+                .Cast<string>()
+                .Any(f => string.Equals(f, path, StringComparison.OrdinalIgnoreCase));
+            if (!advertised) return;
+
+            // Synchronous, and knowingly so: the file must not be deleted until
+            // this has replaced the reference to it. It is one capture on a path
+            // the user reaches only by deleting what they just copied.
+            ClipboardWriter.Write(PngDecoder.Decode(path), filePath: null);
+        }
+        catch (Exception e) when (e is ExternalException or ClipboardUnavailableException
+                                    or ImageDecodeException or IOException)
+        {
+            // Losing the clipboard is not worth failing a delete over.
+        }
     }
 
     private static void TryDeleteFile(string path)
