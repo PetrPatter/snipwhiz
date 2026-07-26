@@ -75,7 +75,7 @@ Snipwhiz.App  (WPF, net10.0-windows10.0.22621.0)
 
               ▲ depends on ▼
 
-Snipwhiz.Core  (no WPF reference)
+Snipwhiz.Core  (no WPF; see note on WinForms below)
   Geometry/   VirtualDesktop · MonitorInfo · coordinate conversion   ← unit tested
   Capture/    DesktopGrabber (BitBlt) → FrozenDesktop
   Hotkeys/    HotkeyService (message-only window)
@@ -87,9 +87,23 @@ Snipwhiz.Core  (no WPF reference)
 without a desktop session." That reason was false — xUnit can reference a
 WPF-targeted library and run pure static functions headlessly; only
 `Dispatcher`/`Window` instantiation needs a session. The split is kept for
-namespace discipline and to keep a UI-framework dependency out of the layer that
-will later be shared with a WebView2 host, which is a real but much smaller
-benefit than claimed.
+namespace discipline and to keep **WPF** out of the layer later shared with a
+WebView2 host, which is a real but much smaller benefit than claimed.
+
+**Core does reference WinForms** (`UseWindowsForms`), discovered during
+implementation. `HotkeyService` needs a message-only window to receive
+`WM_HOTKEY`, and `System.Windows.Forms.NativeWindow` is the in-box way to get
+one with correct `WndProc` marshalling. The alternative is ~40 lines of raw
+`CreateWindowEx` plus a manually lifetime-managed `WndProc` delegate — more code
+and easier to get wrong, for no benefit on a Windows-only product.
+
+Consequences, recorded so this is a decision rather than a surprise:
+
+- Core is not usable headlessly or cross-platform. Neither is required.
+- `System.Drawing.Common` no longer needs an explicit `PackageReference` in Core;
+  WinForms supplies it. `PngEncoder` is its only consumer.
+- **WPF is still absent from Core**, which is the part that actually matters for
+  the spec 2 WebView2 host.
 
 **Tray:** WinForms `NotifyIcon` via `<UseWindowsForms>true</UseWindowsForms>`.
 In-box, zero dependencies, and its `ShowBalloonTip` solves §6's notification
@@ -134,8 +148,18 @@ from Windows and is scaled incorrectly on every monitor that doesn't match it.
 Cost: a drag crossing monitors must be coordinated. `SelectionController` owns
 one rect in virtual-screen physical pixels; each overlay renders only the
 intersection with its own bounds. Pointer capture stays on the window where the
-drag began, and cursor position comes from `GetCursorPos`, which returns physical
-virtual-screen coordinates under PerMonitorV2 awareness.
+drag began.
+
+**Cursor position does not come from `GetCursorPos`** — rev. 2 said it did, and
+the code never has. It comes from WPF's `MouseEventArgs.GetPosition(this)` on the
+overlay that received the event, converted to virtual physical pixels through
+*that* monitor's own scale factor and origin (`OverlayWindow.ToVirtualPixels`).
+This is the right source and not merely an equivalent one: the drag must be
+expressed in the coordinate space of the window WPF actually delivered the event
+to, including while pointer capture is holding events on the originating overlay
+after the cursor has crossed onto a differently-scaled monitor. Task 9 verified
+this across the 125% / 100% pair. `GetCursorPos` has accordingly been removed
+from `NativeMethods.txt`; nothing calls it.
 
 ### 4.3 Coordinate spaces — name them, convert at the edges
 
@@ -191,9 +215,23 @@ revisit this will reverse it for a cause that was never true.
 **Flags: `SRCCOPY | CAPTUREBLT`.** By default `BitBlt` from the screen DC
 excludes layered windows — you lose menu and tooltip shadows, transparent overlay
 windows, and some IME candidate windows. ShareX and Greenshot both pass
-`CAPTUREBLT` for exactly this reason. It has a known cost (brief cursor flicker
-or screen blink on some configurations). We accept the flicker; missing content
-in a screenshot is a correctness bug, flicker is a cosmetic one.
+`CAPTUREBLT` for exactly this reason. It has a known cosmetic cost (brief cursor
+flicker or screen blink on some configurations), which we accept: missing content
+in a screenshot is a correctness bug, flicker is not.
+
+**Measured, 2026-07-25** (dual display, 3840×1257, 125% + 100%, hybrid
+Quadro P3200 + Intel UHD 630), median of 15 after warmup:
+
+| Variant | Median |
+|---|---|
+| `SRCCOPY \| CAPTUREBLT`, whole desktop | 66.6–67.0 ms |
+| `SRCCOPY` alone, whole desktop | 66.6–66.7 ms |
+| `SRCCOPY \| CAPTUREBLT`, per-monitor, summed | 66.3–66.9 ms |
+
+**`CAPTUREBLT` costs no measurable time**, so the flag is free correctness rather
+than a tradeoff. Splitting the grab per monitor to avoid one cross-adapter span
+saves nothing either — the cost is inherent to reading a desktop composited
+across two adapters.
 
 **What `BitBlt` cannot capture — two distinct classes, not one:**
 
@@ -232,6 +270,31 @@ monitor configuration we ship to:
   (§4.4). That is a different architecture, not a tuning pass, which is why it
   is decided up front rather than discovered late.
 
+**Measured, 2026-07-25 — gate PASSED, with less headroom than assumed:**
+
+| Configuration | Displays | MP | Median |
+|---|---|---|---|
+| Laptop only (DPI-virtualised, invalid) | 1 | 1.3 | 32.0 ms |
+| Laptop only, DPI-aware | 1 | 2.1 | 33.1 ms |
+| Laptop + external, 125% + 100% | **2** | 4.8 | **79.6 ms** |
+
+**The cost driver is display count, not pixel count.** Going 1.3 → 2.1 MP on one
+display cost 4%; adding a second display cost 140%. The test machine has hybrid
+graphics (Quadro P3200 + Intel UHD 630), so spanning the grab forces a
+cross-adapter composite.
+
+Consequences to carry forward:
+
+- Two displays consume **66% of the budget**. A third display, or 4K panels,
+  could plausibly exceed it. Recheck on real target hardware — §7 item 7.
+- **Do not extrapolate this by pixel count.** That was tried twice during
+  planning and was wrong in both directions, badly.
+- ~13 ms of the 79.6 ms is `Grab()` re-enumerating monitors and reading cursor
+  state on every call. Caching enumeration behind a `WM_DISPLAYCHANGE`
+  invalidation is the known lever if headroom is ever needed. **Not done now:**
+  the gate passes, and stale monitor topology after a hot-plug is a worse bug
+  than 13 ms.
+
 ### 4.6 No capture library, but GDI handles still need owning
 
 With `BitBlt` the grab is `CreateCompatibleDC` / `CreateCompatibleBitmap` /
@@ -241,8 +304,23 @@ With `BitBlt` the grab is `CreateCompatibleDC` / `CreateCompatibleBitmap` /
 Rev. 1 claimed CsWin32 means "no hand-written P/Invoke to get wrong." It
 generates *signatures*; it does not manage lifetime. In a tray app that runs for
 weeks, leaking an `HDC` or `HBITMAP` per capture is a real, slow failure.
-Every GDI handle is wrapped in a `SafeHandle` and released in a `finally`, and
-§7 has a soak test for it.
+
+**Ownership rule, settled during Task 2.** Rev. 2 said "every GDI handle is
+wrapped in a `SafeHandle`"; that was reworded in the plan and never here.
+The rule that actually ships is narrower and matches the code:
+
+- **Method-scoped handles** — everything the `BitBlt` grab creates and releases
+  within one call — use `try`/`finally` with an explicit, correct teardown order
+  (deselect the original bitmap before deleting ours, release the screen DC last).
+  A `SafeHandle` per handle buys nothing here: the scope is a single method with
+  no reentrancy, and the ordering constraint is the part that actually matters
+  and that a `SafeHandle` does not express.
+- **Handles stored in fields**, outliving the call that created them, must be
+  `SafeHandle`-wrapped — there is no scope to hang a `finally` on. Spec 1 has
+  none, so this rule is currently vacuous, and is recorded for when it isn't.
+
+§7 has a soak test for the whole thing regardless, which is the check that would
+actually catch a leak.
 
 ### 4.7 Hotkeys — and PrintScreen is not the signal you think
 
@@ -264,8 +342,16 @@ still opens Snipping Tool."* A fallback gated on the return code therefore never
 fires for the people who need it.
 
 **Detect by state, not by return code:** read
-`HKCU\Control Panel\Keyboard\PrintScreenKeyForSnippingEnabled` directly, and
-confirm functionally that a `WM_HOTKEY` actually arrives.
+`HKCU\Control Panel\Keyboard\PrintScreenKeyForSnippingEnabled` directly.
+
+Rev. 2 added "and confirm functionally that a `WM_HOTKEY` actually arrives."
+**That is not implemented, and §9 establishes it cannot be** — clearing the
+registry value does not take effect until the user signs out, so in the session
+where we ask, no `WM_HOTKEY` will ever arrive no matter how correct the takeover
+was. A functional confirmation would therefore report failure on every successful
+takeover, which is worse than not checking. The registry state plus
+`RegisterHotKey`'s return code is all the signal available in-session; the
+balloon says a sign-out is needed rather than claiming the key is live.
 
 **Offer, with consent:**
 
@@ -358,8 +444,29 @@ keystroke.
   be refused. **If activation fails, the capture aborts and tears down** rather
   than leaving an unfocusable fullscreen window.
 - **Unconditional escape hatch:** a watchdog closes all overlays if none has
-  received input within 60 s, and the tray menu always offers "Cancel capture".
+  received input within 60 s. The timer is **input-resetting** — restarted on
+  every drag start and pointer move — so it measures idleness, not elapsed time
+  since the hotkey. A fixed 60 s from `Start()` yanked the selection out from
+  under anyone composing a careful crop for over a minute.
+- **The second escape is right-click on any overlay, not the tray menu.** Rev. 2
+  named the tray menu's "Cancel capture" as the escape hatch; it is **not
+  reachable while overlays are up**, because opaque topmost fullscreen windows
+  cover the taskbar and notification area on every monitor. The menu item still
+  exists and still works — it is simply not an escape hatch, so it must not be
+  counted as one. The two that are: **Esc** and **right-click**, both handled on
+  every overlay.
+- **A teardown that throws must not become a trap.** `_closed` is latched, and
+  `Cancelled` raised, in a `finally`; each overlay's `Close()` is individually
+  guarded. Latching the flag *before* doing the work meant one throw inside
+  teardown (the `DisplaySettingsChanged` cross-thread `Close()`, §8) disarmed the
+  watchdog, skipped `Cancelled`, and left every remaining exit a no-op behind
+  fullscreen windows — Task Manager only.
 - Overlays are `WS_EX_TOOLWINDOW` — absent from Alt+Tab and the taskbar.
+- **`SystemEvents` handlers are marshalled to the UI thread.**
+  `DisplaySettingsChanged` is raised on Microsoft.Win32's own pump thread
+  (`.NET System Events`), never the WPF dispatcher thread; `Window.Close()` from
+  there throws and `SystemEvents` **swallows** the exception. Every such handler
+  must `Dispatcher.BeginInvoke` its work.
 
 ---
 
@@ -430,14 +537,21 @@ no AUMID.
 | Hotkey conflict | Per-chord; app starts, balloon names the chord, tray menu still works (§4.7) |
 | Activation refused | Abort and tear down; never leave an unfocusable fullscreen window (§4.11) |
 | All-black frame | Say so rather than silently saving a black rectangle — and distinguish the two causes (§4.4): DRM is a permanent limitation, fullscreen-exclusive is not |
-| Desktop switch mid-capture | UAC/secure desktop abort (§8) |
+| Display topology changes mid-capture | Abort and tear down — the frozen bitmap no longer matches reality. Balloon says why (§4.11) |
+| Desktop switch mid-capture (UAC) | **Not handled.** No abort, by decision — see §8 |
 
 **Ordering: clipboard first, then disk.** The clipboard is what the user is about
 to paste and must not block on I/O. (Rev. 1 attached this rationale to the wrong
 table row.)
 
 Everything else aborts the capture and closes the overlay. Silent failure is not
-acceptable — the user pressed a key and must learn whether it worked.
+acceptable — the user pressed a key and must learn whether it worked. Concretely,
+**every non-user-initiated abort is reported**: the overlay-placement invariant
+throws a descriptive exception (routing to the "Capture failed" balloon via
+`DispatcherUnhandledException`) instead of returning silently, and the watchdog
+timeout and display-change cancel raise `CaptureSession.Aborted` with a reason
+the tray shows. Only Esc and right-click are silent — the user who pressed them
+already knows.
 
 ---
 
@@ -491,13 +605,30 @@ mixed-DPI multi-monitor and never came back to the shipping baseline:
 11. Hotkey conflict: confirm defaults register on a stock box; accept the
     PrintScreen prompt and confirm it works; decline it and confirm the registry
     is untouched
-12. Trigger a UAC prompt while the overlay is open → clean abort, no orphaned window
-13. Deny activation (overlay opened over an elevated foreground window) → aborts
-14. Disconnect a monitor while the overlay is open → clean abort, no crash
-15. Autostart survives a reboot
-16. Second instance launch → focuses the existing one
-17. **Soak:** run a week, capture repeatedly, watch GDI handle count in Task
-    Manager stay flat (§4.6)
+12. Deny activation (overlay opened over an elevated foreground window) → aborts
+13. Disconnect a monitor while the overlay is open → overlays close, a balloon
+    says the display configuration changed, and `Ctrl+Shift+1` still works
+    afterwards. **The regression this guards:** the handler runs on the
+    `SystemEvents` pump thread, so an unmarshalled `Close()` throws, is swallowed,
+    and — with the latch already set — leaves opaque fullscreen windows with every
+    exit disabled (§4.11)
+14. Autostart survives a reboot
+15. Second instance launch → **exits silently, leaving the first running.** There
+    is nothing to focus: a tray app has no main window, and stealing focus to a
+    tray icon is not a meaningful action. Rev. 2 said "focuses the existing one";
+    the code exits, and the code is right
+16. **Soak:** run a week, capture repeatedly, and watch **both**:
+    - **GDI handle count** in Task Manager stays flat (§4.6)
+    - **managed working set** stays flat. `RenderFrozenSlice` allocates a
+      monitor-sized `Crop` (~8 MB, straight to the LOH) per overlay per
+      invocation — and it runs again on every DPI change, not just once — while
+      each grab allocates a ~19 MB virtual-desktop buffer. Handle count would
+      stay perfectly flat while this leaked, so watching it alone proves nothing
+      about the larger of the two costs
+
+**No longer tested — the behaviour is not implemented, by decision:** "trigger a
+UAC prompt while the overlay is open → clean abort". §8 records why there is no
+desktop-switch abort and why Esc/right-click remain the exit.
 
 ---
 
@@ -507,8 +638,25 @@ mixed-DPI multi-monitor and never came back to the shipping baseline:
   or anyone's (§4.4). Snipping Tool has the same limitation.
 - **The UAC prompt itself cannot be captured** — it lives on a separate desktop.
   Users will try. If the overlay is open when UAC appears, the desktop switches
-  and the overlay is orphaned behind it; detect the desktop/session change and
-  abort.
+  and the overlay is left behind it.
+
+  **The overlay is not torn down on a desktop switch, and spec 1 does not attempt
+  it.** Rev. 2 said to "detect the desktop/session change and abort"; no such code
+  was ever written, and honest detection is harder than that sentence implies.
+  `SystemEvents.SessionSwitch` covers workstation lock and fast user switching —
+  **not** the UAC secure desktop, which is a desktop switch within the same
+  session and raises no managed event. Detecting it properly means polling
+  `OpenInputDesktop`/`GetThreadDesktop` on a timer and reasoning about which
+  desktop is current, which is a real chunk of interop to add a teardown for a
+  situation the user can already exit.
+
+  **What actually happens, and why it is acceptable:** the secure desktop draws
+  over everything; when the user answers the prompt, the overlay is still there,
+  still frozen, still holding a bitmap that is still accurate (a UAC prompt does
+  not change the desktop underneath). **Esc and right-click still work**, and the
+  60 s input-resetting watchdog is still the backstop. Nobody is trapped. If a
+  later spec wants a clean abort here, the mechanism is the desktop poll above —
+  recorded so it is a decision, not an oversight.
 - **Fullscreen-exclusive games:** the hotkey forces a mode switch and minimises
   the game, *and* the frozen bitmap is black. Detect, decline, and say why rather
   than shipping the classic "screenshot tool killed my game" report.
@@ -523,9 +671,16 @@ mixed-DPI multi-monitor and never came back to the shipping baseline:
 
 ## 9. Open question
 
-**PrintScreen takeover timing** (§4.7) — determine during implementation whether
-clearing `PrintScreenKeyForSnippingEnabled` applies immediately or needs a
-sign-out, and word the prompt to match. Affects copy, not design.
+**Resolved during implementation (Task 11).** Clearing
+`PrintScreenKeyForSnippingEnabled` and re-registering the hotkey **does not**
+take effect in the current session — verified by clearing the value, confirming
+`RegisterHotKey` succeeded (`PrintScreenTakenOver: true`), and pressing
+PrintScreen: no overlay opened and no `WM_HOTKEY` arrived, with the setting
+correctly at `0` the whole time. A sign-out is required before Windows stops
+routing PrintScreen to Snipping Tool. The balloon copy in `TryClaimPrintScreen`
+now says so plainly ("Sign out and back in to finish switching PrintScreen away
+from Snipping Tool") rather than hedging with "if it still opens Snipping
+Tool".
 
 **Resolved since rev. 1:** product name is Snipwhiz; the WGC-latency and
 capture-library spikes were dissolved by the `BitBlt` decision; the grab-latency

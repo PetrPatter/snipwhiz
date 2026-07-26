@@ -1,0 +1,25 @@
+<UserControl x:Class="Snipwhiz.App.Loupe"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsHitTestVisible="False" Width="136">
+  <Border Background="#0C0906" BorderBrush="#66FFB627" BorderThickness="1" CornerRadius="7">
+    <StackPanel>
+      <Grid Width="134" Height="134" ClipToBounds="True">
+        <Image x:Name="Glass" Stretch="Fill"
+               RenderOptions.BitmapScalingMode="NearestNeighbor"
+               RenderOptions.EdgeMode="Aliased" />
+        <Rectangle x:Name="Cross" Width="10" Height="10"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Stroke="#FFB627" StrokeThickness="1.5" />
+      </Grid>
+      <StackPanel Margin="8,6">
+        <StackPanel Orientation="Horizontal">
+          <Rectangle x:Name="Swatch" Width="11" Height="11" Margin="0,0,7,0"
+                     Stroke="#40FFFFFF" StrokeThickness="1" />
+          <TextBlock x:Name="Hex" Foreground="#F6F2EB" FontFamily="Consolas" FontSize="11" />
+        </StackPanel>
+        <TextBlock x:Name="Coords" Foreground="#877D72" FontFamily="Consolas" FontSize="10" Margin="0,2,0,0" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>
