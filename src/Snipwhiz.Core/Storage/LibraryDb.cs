@@ -102,15 +102,84 @@ public sealed class LibraryDb : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    private const string SelectColumns =
+        "SELECT id, created_utc, width, height, source_app, source_title, file_path FROM captures";
+
     public IReadOnlyList<CaptureRecord> Recent(int limit)
     {
         using var cmd = _connection.CreateCommand();
-        cmd.CommandText = """
-            SELECT id, created_utc, width, height, source_app, source_title, file_path
-            FROM captures ORDER BY created_utc DESC, id DESC LIMIT $limit;
-            """;
+        cmd.CommandText = $"{SelectColumns} ORDER BY created_utc DESC, id DESC LIMIT $limit;";
         cmd.Parameters.AddWithValue("$limit", limit);
+        return ReadAll(cmd);
+    }
 
+    /// <summary>
+    /// One page, newest first. Keyset rather than OFFSET: a capture taken between
+    /// two page fetches shifts every offset by one, so the last row of a page
+    /// reappears as the first row of the next. Live insert makes that routine.
+    /// </summary>
+    /// <param name="after">The last record of the previous page; null for the first.</param>
+    public IReadOnlyList<CaptureRecord> Page(CaptureRecord? after, int limit)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = $"""
+            {SelectColumns}
+            WHERE $first = 1
+               OR created_utc < $created
+               OR (created_utc = $created AND id < $id)
+            ORDER BY created_utc DESC, id DESC
+            LIMIT $limit;
+            """;
+        cmd.Parameters.AddWithValue("$first", after is null ? 1 : 0);
+        cmd.Parameters.AddWithValue("$created", after?.CreatedUtc.ToUnixTimeMilliseconds() ?? 0L);
+        // v7 GUIDs in "D" form are fixed-width lowercase hex, so text comparison
+        // matches numeric order — and since v7 leads with the timestamp, the
+        // tiebreak within a single millisecond is still time-ordered.
+        cmd.Parameters.AddWithValue("$id", after?.Id.ToString("D") ?? "");
+        cmd.Parameters.AddWithValue("$limit", limit);
+        return ReadAll(cmd);
+    }
+
+    /// <summary>Substring match over source app and window title.</summary>
+    public IReadOnlyList<CaptureRecord> Search(string query, int limit)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = $"""
+            {SelectColumns}
+            WHERE source_app   LIKE $q ESCAPE '\'
+               OR source_title LIKE $q ESCAPE '\'
+            ORDER BY created_utc DESC, id DESC
+            LIMIT $limit;
+            """;
+        // Backslash first, or the escapes get escaped. Without this a typed '%'
+        // matches every row in the library.
+        var escaped = query
+            .Replace("\\", "\\\\")
+            .Replace("%", "\\%")
+            .Replace("_", "\\_");
+        cmd.Parameters.AddWithValue("$q", $"%{escaped}%");
+        cmd.Parameters.AddWithValue("$limit", limit);
+        return ReadAll(cmd);
+    }
+
+    /// <returns>True if a row was removed.</returns>
+    public bool Delete(Guid id)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM captures WHERE id = $id;";
+        cmd.Parameters.AddWithValue("$id", id.ToString("D"));
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
+    public int Count()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM captures;";
+        return Convert.ToInt32(cmd.ExecuteScalar());
+    }
+
+    private static List<CaptureRecord> ReadAll(SqliteCommand cmd)
+    {
         var results = new List<CaptureRecord>();
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
