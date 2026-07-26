@@ -308,6 +308,11 @@ public partial class App : Application
 
     private void Report(CaptureOutcome outcome)
     {
+        // Only a successful save has a record. CaptureOutcome.Record is null
+        // whenever the disk or database write failed, and inserting a tile for one
+        // of those would show a capture that has neither a row nor a file.
+        if (outcome.Record is not null) _library?.OnCaptureCompleted(outcome.Record);
+
         if (outcome.Warning is not null)
             _tray!.ShowBalloon("Capture problem", outcome.Warning, isError: !outcome.ClipboardOk);
         else

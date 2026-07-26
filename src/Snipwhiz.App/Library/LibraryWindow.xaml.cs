@@ -42,9 +42,23 @@ public partial class LibraryWindow : Window
 
         UndoButton.Click += (_, _) => UndoLastDelete();
 
+        // 200 ms after the last keystroke, not on every one — otherwise a typed
+        // word runs a query per character and the grid flickers through them.
+        _searchDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        _searchDebounce.Tick += (_, _) =>
+        {
+            _searchDebounce!.Stop();
+            _model.Search(SearchBox.Text);
+            UpdateEmptyState();
+        };
+        SearchBox.TextChanged += (_, _) => { _searchDebounce!.Stop(); _searchDebounce.Start(); };
+
         // One handler for every tile rather than plumbing a click event through
         // the templates: find the tile the click landed in and open it.
         RowsHost.PreviewMouseLeftButtonUp += OnGridClick;
+
+        CaptureTile.RemoveRequested += OnRemoveRequested;
+        Closed += (_, _) => CaptureTile.RemoveRequested -= OnRemoveRequested;
 
         SourceInitialized += (_, _) =>
         {
@@ -73,6 +87,21 @@ public partial class LibraryWindow : Window
 
     private readonly PreviewView _preview;
     private ScrollViewer? _scroller;
+    private readonly DispatcherTimer _searchDebounce;
+
+    /// <summary>
+    /// A capture taken while this window is open, inserted without a re-query —
+    /// the record is already in hand.
+    /// </summary>
+    public void OnCaptureCompleted(CaptureRecord record)
+    {
+        // Deliberately not gated on IsVisible: the window is hidden at this moment
+        // because it hid itself for the capture (§4.14), and the report arrives
+        // before it is restored. Gating here would drop every live insert.
+        _model.InsertNewest(record);
+        UpdateEmptyState();
+        RefreshFooter();
+    }
 
     private static readonly TimeSpan UndoWindow = TimeSpan.FromSeconds(5);
 
@@ -171,9 +200,27 @@ public partial class LibraryWindow : Window
         var tile = FindAncestor<CaptureTile>(e.OriginalSource as DependencyObject);
         if (tile?.DataContext is not CaptureTileViewModel model) return;
 
+        // A capture with no file has nothing to preview; its only action is to
+        // remove the row, which the tile itself offers.
+        if (model.IsMissing) return;
+
         RootContent.Visibility = Visibility.Collapsed;
         _preview.Open(model.Record);
         _preview.Focus();
+    }
+
+    /// <summary>
+    /// The row for a capture whose file the user deleted behind the database's
+    /// back. There is nothing to put in the undo bin, so this is not a delete —
+    /// the row simply goes.
+    /// </summary>
+    private void OnRemoveRequested(CaptureRecord record)
+    {
+        _store.Delete(record.Id);
+        _thumbnails.Remove(record.Id);
+        _model.Remove(record.Id);
+        UpdateEmptyState();
+        RefreshFooter();
     }
 
     private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
@@ -289,10 +336,19 @@ public partial class LibraryWindow : Window
     /// Count is a single indexed aggregate and stays on the UI thread by the rule
     /// in spec 2a §4.5. The byte total is a directory walk, so it does not.
     /// </summary>
+    private void UpdateEmptyState()
+    {
+        var empty = _model.Count == 0;
+        EmptyState.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Text = _model.IsSearching
+            ? $"Nothing matches “{SearchBox.Text.Trim()}”."
+            : "No captures yet.\nPress Ctrl+Shift+1 to capture a region.";
+    }
+
     private async void RefreshFooter()
     {
         var count = _store.Count();
-        EmptyState.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateEmptyState();
 
         var bytes = await Task.Run(_store.TotalBytes);
         Footer.Text = count == 0

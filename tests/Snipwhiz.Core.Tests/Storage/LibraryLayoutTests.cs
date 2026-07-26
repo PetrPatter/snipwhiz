@@ -29,7 +29,7 @@ public class LibraryLayoutTests
         Assert.Collection(rows,
             r => Assert.Equal("Today", Assert.IsType<DayHeaderRow>(r).Label),
             r => Assert.Equal(3, Assert.IsType<TileRow>(r).Captures.Count),
-            r => Assert.Equal(1, Assert.IsType<TileRow>(r).Captures.Count),
+            r => Assert.Single(Assert.IsType<TileRow>(r).Captures),
             r => Assert.Equal("Yesterday", Assert.IsType<DayHeaderRow>(r).Label),
             r => Assert.Equal(3, Assert.IsType<TileRow>(r).Captures.Count));
     }

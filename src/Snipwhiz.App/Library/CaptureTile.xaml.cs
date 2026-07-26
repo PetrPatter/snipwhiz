@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Snipwhiz.Core.Storage;
 
 namespace Snipwhiz.App.Library;
 
@@ -14,7 +15,22 @@ public partial class CaptureTile : System.Windows.Controls.UserControl
         DataContextChanged += OnDataContextChanged;
         Unloaded += (_, _) => CancelPending();
         CardContent.SizeChanged += (_, e) => ClipToRoundedCorners(e.NewSize);
+
+        RemoveButton.Click += (_, e) =>
+        {
+            // Stop the click reaching the grid handler, which would otherwise try
+            // to open a preview of the capture being removed.
+            e.Handled = true;
+            if (DataContext is CaptureTileViewModel model) RemoveRequested?.Invoke(model.Record);
+        };
     }
+
+    /// <summary>
+    /// Raised for a capture whose original file is gone (spec 2a §4.12). Static
+    /// because tiles are created by a DataTemplate, so there is no construction
+    /// site to wire an instance event at.
+    /// </summary>
+    public static event Action<CaptureRecord>? RemoveRequested;
 
     /// <summary>
     /// Rounds off the card's content so it stops painting over the border's corner

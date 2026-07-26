@@ -45,11 +45,21 @@
                        Stretch="Uniform"
                        RenderOptions.BitmapScalingMode="HighQuality"/>
 
-                <TextBlock Text="Unavailable"
-                           Foreground="#8F8A80" FontSize="12"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Visibility="{Binding IsMissing,
-                                        Converter={StaticResource BoolToVisibility}}"/>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Visibility="{Binding IsMissing,
+                                         Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="File missing"
+                               Foreground="#C9C3B8" FontSize="12"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Dimensions}"
+                               Foreground="#6E6960" FontSize="11" Margin="0,4,0,0"
+                               HorizontalAlignment="Center"/>
+                    <Button x:Name="RemoveButton"
+                            Content="Remove from library"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="#E8833A" FontSize="11"
+                            Margin="0,8,0,0" Padding="6,3" Cursor="Hand"/>
+                </StackPanel>
             </Grid>
 
             <Grid Margin="12,9,12,11">

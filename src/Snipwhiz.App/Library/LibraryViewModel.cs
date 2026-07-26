@@ -32,6 +32,10 @@ public sealed class LibraryViewModel(CaptureStore store, ThumbnailCache cache)
         Rebuild();
     }
 
+    private string _query = string.Empty;
+
+    public bool IsSearching => _query.Length > 0;
+
     public void Reload()
     {
         _records.Clear();
@@ -40,6 +44,36 @@ public sealed class LibraryViewModel(CaptureStore store, ThumbnailCache cache)
         Rows.Clear();
         LoadNextPage();
     }
+
+    /// <summary>
+    /// Replaces the paged view with search results, or restores paging when the
+    /// query is cleared. Results are not paged: the limit is the cap, and a query
+    /// that matches more than that wants refining, not scrolling.
+    /// </summary>
+    public void Search(string query)
+    {
+        query = query.Trim();
+        if (query == _query) return;
+        _query = query;
+
+        _records.Clear();
+        _tiles.Clear();
+        Rows.Clear();
+
+        if (query.Length == 0)
+        {
+            _exhausted = false;
+            LoadNextPage();
+            return;
+        }
+
+        // Nothing more to fetch on scroll — results are one shot.
+        _exhausted = true;
+        _records.AddRange(store.Search(query, SearchLimit));
+        Rebuild();
+    }
+
+    private const int SearchLimit = 500;
 
     /// <summary>
     /// Fetches the next keyset page. Re-entrancy guarded: a fast scroll fires
@@ -69,9 +103,14 @@ public sealed class LibraryViewModel(CaptureStore store, ThumbnailCache cache)
         }
     }
 
-    /// <summary>Inserts a capture taken while the window was open. Task 10 wires this up.</summary>
+    /// <summary>
+    /// Inserts a capture taken while the window was open. Ignored during a search:
+    /// dropping an unrelated capture into a filtered view would be a lie about
+    /// what the query matched.
+    /// </summary>
     public void InsertNewest(CaptureRecord record)
     {
+        if (IsSearching) return;
         if (_records.Any(r => r.Id == record.Id)) return;
         _records.Insert(0, record);
         Rebuild();
