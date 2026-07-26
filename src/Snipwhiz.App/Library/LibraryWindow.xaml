@@ -28,8 +28,6 @@
         <SolidColorBrush x:Key="InkMuted" Color="#8F8A80"/>
         <SolidColorBrush x:Key="Accent" Color="#E8833A"/>
 
-        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
-
         <!-- Implicit templates: the ContentPresenter for each row picks by type. -->
         <DataTemplate DataType="{x:Type core:DayHeaderRow}">
             <TextBlock Text="{Binding Label}"
@@ -98,6 +96,7 @@
                           ItemsSource="{Binding Rows}"
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Recycling"
+                          VirtualizingPanel.ScrollUnit="Pixel"
                           ScrollViewer.CanContentScroll="True">
 
                 <!-- ItemsControl does not virtualize on its own: it needs a
@@ -105,7 +104,8 @@
                      Miss either and it silently realizes every row. -->
                 <ItemsControl.Template>
                     <ControlTemplate TargetType="ItemsControl">
-                        <ScrollViewer CanContentScroll="True"
+                        <ScrollViewer x:Name="Scroller"
+                                      CanContentScroll="True"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled"
                                       Padding="0,0,8,0">

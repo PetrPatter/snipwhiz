@@ -3,6 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Width="252" Margin="0,0,16,16">
 
+    <!--
+      Declared here, not in the window. StaticResource is resolved when this
+      control is parsed, which happens before it is attached to the window's
+      tree - so a converter living in Window.Resources is simply not found and
+      the whole template throws.
+    -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </UserControl.Resources>
+
     <Border Background="#26241F" CornerRadius="10" Padding="0" ClipToBounds="True">
         <StackPanel>
             <!-- Fixed box so rows have a uniform height; the panel virtualizes

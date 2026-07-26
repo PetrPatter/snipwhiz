@@ -43,12 +43,38 @@ public partial class LibraryWindow : Window
         {
             RowsHost.AddHandler(ScrollViewer.ScrollChangedEvent,
                 new ScrollChangedEventHandler(OnScrollChanged));
+
+            RowsHost.ApplyTemplate();
+            _scroller = RowsHost.Template.FindName("Scroller", RowsHost) as ScrollViewer;
+
             ApplyColumns();
             _model.Reload();
             RefreshFooter();
         };
 
         SizeChanged += (_, _) => ApplyColumns();
+    }
+
+    private ScrollViewer? _scroller;
+
+    /// <summary>
+    /// Pixels moved per wheel notch. WPF's own step is tuned for text lines and
+    /// covers most of a tile row here, which reads as the grid lurching rather
+    /// than scrolling. Roughly half a row feels like a scroll.
+    /// </summary>
+    private const double WheelStep = 110;
+
+    protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
+    {
+        if (_scroller is null)
+        {
+            base.OnPreviewMouseWheel(e);
+            return;
+        }
+
+        _scroller.ScrollToVerticalOffset(
+            _scroller.VerticalOffset - e.Delta / 120.0 * WheelStep);
+        e.Handled = true;
     }
 
     private void ApplyColumns()

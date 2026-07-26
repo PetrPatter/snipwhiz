@@ -42,7 +42,9 @@ public partial class App : Application
         // oversight.
         DispatcherUnhandledException += (_, ex) =>
         {
-            _tray?.ShowBalloon("Capture failed", ex.Exception.Message, isError: true);
+            // Not "Capture failed" any more — this now catches library faults too,
+            // and a wrong label sends the user looking in the wrong place.
+            _tray?.ShowBalloon("Snipwhiz hit a problem", ex.Exception.Message, isError: true);
             ex.Handled = true;
         };
 
