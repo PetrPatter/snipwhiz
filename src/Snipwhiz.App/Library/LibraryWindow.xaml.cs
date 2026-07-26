@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Snipwhiz.Core.Imaging;
@@ -82,9 +83,24 @@ public partial class LibraryWindow : Window
             RowsHost.ApplyTemplate();
             _scroller = RowsHost.Template.FindName("Scroller", RowsHost) as ScrollViewer;
 
+            // Negative control for the virtualization gate: a plain StackPanel
+            // realizes every row, which is exactly what the gate must detect.
+            if (Diagnostics.GridVerification.BreakVirtualization)
+            {
+                RowsHost.ItemsPanel = (ItemsPanelTemplate)XamlReader.Parse(
+                    """
+                    <ItemsPanelTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+                      <StackPanel/>
+                    </ItemsPanelTemplate>
+                    """);
+            }
+
             ApplyColumns();
             _model.Reload();
             RefreshFooter();
+
+            if (Diagnostics.GridVerification.IsEnabled && _scroller is not null)
+                Diagnostics.GridVerification.Sweep(RowsHost, _scroller, () => _model.Count);
         };
 
         SizeChanged += (_, _) => ApplyColumns();
@@ -274,7 +290,6 @@ public partial class LibraryWindow : Window
         var remaining = e.ExtentHeight - (e.VerticalOffset + e.ViewportHeight);
         if (remaining <= e.ViewportHeight) _model.LoadNextPage();
 
-        Diagnostics.GridVerification.Sample(RowsHost, _model.Count);
     }
 
     /// <summary>Shows or brings forward the single instance.</summary>

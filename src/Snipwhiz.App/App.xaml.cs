@@ -20,7 +20,12 @@ public partial class App : Application
     private CaptureStore? _store;
     private CapturePipeline? _pipeline;
     private readonly BitBltGrabber _grabber = new();
-    private string _root = CaptureStore.DefaultRoot;
+    // Overridable so verification runs against a throwaway library instead of the
+    // user's real captures. Unset in normal use.
+    private readonly string _root =
+        Environment.GetEnvironmentVariable("SNIPWHIZ_ROOT") is { Length: > 0 } root
+            ? root
+            : CaptureStore.DefaultRoot;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -54,6 +59,10 @@ public partial class App : Application
             _store = new CaptureStore(_root);
             _pipeline = new CapturePipeline(_store);
 
+            // Inert unless SNIPWHIZ_SEED is set, and refuses to run against the
+            // real library. See Diagnostics.LibrarySeed.
+            Diagnostics.LibrarySeed.RunIfRequested(_store);
+
             _tray = new TrayHost(settings, _root);
             _tray.FullscreenRequested += CaptureFullscreen;
             _tray.RegionRequested += CaptureRegion;
@@ -70,6 +79,15 @@ public partial class App : Application
             };
 
             RegisterHotkeys();
+
+            // The grid gate drives its own scroll sweep, so it needs the window
+            // open without waiting for someone to press the hotkey.
+            if (Diagnostics.GridVerification.IsEnabled)
+            {
+                ShowLibrary();
+                return;
+            }
+
             _tray.ShowBalloon("Snipwhiz is running", "Press Ctrl+Shift+2 to capture the screen.");
 
             OfferPrintScreenTakeover(settings);
