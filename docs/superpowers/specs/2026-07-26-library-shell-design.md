@@ -46,7 +46,8 @@ path — before any annotation code exists to confound it.
 - A **library window**: virtualized grid of every capture, newest first
 - **Day grouping** — "Today", "Yesterday", then absolute dates
 - **Thumbnails**, generated lazily and cached on disk (§4.2)
-- **Copy to clipboard** from the grid, reusing spec 1's multi-format writer
+- A **preview view** — click a tile to see the capture at full size (§4.11)
+- **Copy to clipboard** via `Ctrl+C` or a button, reusing spec 1's multi-format writer
 - **Search** over source app and window title (§4.7)
 - **Delete**, with the file and the row both removed (§4.6)
 - **Live insert** — a capture taken while the window is open appears in it (§4.8)
@@ -85,6 +86,7 @@ path — before any annotation code exists to confound it.
 │   LibraryWindow.xaml     grid, search box, day headers  │
 │   LibraryViewModel       paging, filtering, commands    │
 │   CaptureTile.xaml       one thumbnail + hover actions  │
+│   PreviewView.xaml       full-size overlay, Copy, Esc   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -156,6 +158,10 @@ don't come out with black or blue backgrounds. **Re-copy from the library must g
 through the same path**, or it will reintroduce exactly the defect spec 1 spent
 its clipboard task preventing.
 
+There is exactly **one** copy path in the app, invoked from both the preview's
+button and its `Ctrl+C` handler. Two call sites reaching the writer separately is
+how one of them eventually stops matching the other.
+
 ### 4.6 Delete: row first, then file
 
 Deleting the row before the file means a crash between the two leaves an
@@ -209,6 +215,31 @@ The call is best-effort: if it fails the window is a solid warm-neutral dark
 surface and **nothing else changes**. No feature detection branching, no second
 code path.
 
+### 4.11 Preview: a view inside the window, not a second window
+
+Clicking a tile opens the capture large. `Ctrl+C` or a **Copy** button puts it on
+the clipboard; `Esc`, a back button, or clicking outside the image returns to the
+grid.
+
+It is an overlay **inside the library window**, not a new one. A second window
+brings its own DPI handling, its own Mica call, its own placement and z-order
+rules, and a second thing to keep in sync with the grid's selection — for a view
+that is one image and three controls.
+
+The image is the **full PNG decoded on a background thread**, not the thumbnail
+scaled up. The thumbnail is a lossy 320 px preview; showing it at 1200 px is
+exactly the blurry-screenshot-tool look this product exists to avoid. The
+thumbnail may be shown for the few hundred milliseconds the decode takes, then
+replaced — but only if the swap is invisible, and it is worth a look on a slow
+disk before assuming it is.
+
+Displayed **fit-to-window, never upscaled past 100%**. A 200×100 capture shows at
+200×100 in the middle of the view, not blown up to fill it.
+
+Deliberately not here: zoom, pan, and arrow-key navigation between captures. All
+three are reasonable and none are needed to copy an image to the clipboard. Arrow
+navigation is the one most likely to be missed; add it when it is missed.
+
 ---
 
 ## 5. Data model
@@ -248,11 +279,10 @@ New methods on `LibraryDb`, each mirrored on `CaptureStore`:
 3. **Deleting a capture that is currently on the clipboard.** The clipboard holds
    a copy of the bytes, not a file reference, so the paste still works. Worth a
    verification check rather than code.
-4. **Open question — what does clicking a tile do?** Copy, or open a preview?
-   Spec 2b adds an editor and the answer probably becomes "open in editor, with
-   copy on the hover action". For 2a, **single click copies** and shows a toast,
-   because copy is the entire point of the spec. Flagged so 2b revisits it
-   deliberately rather than inheriting it by accident.
+4. **Clicking a tile opens the preview (§4.11); copying is an explicit act**
+   — `Ctrl+C` or the button. Decided, not open. This leaves room for spec 2b to
+   put an **Edit** button beside **Copy** in the same view, rather than having to
+   redefine what a click means once an editor exists.
 
 ---
 
@@ -263,7 +293,9 @@ names the failure it would catch:
 
 | # | Check | Catches |
 |---|---|---|
-| 1 | Paste a library re-copy into Word, Paint, Chrome, Slack | §4.5 bypassing `ClipboardWriter` |
+| 1 | Paste a library re-copy into Word, Paint, Chrome, Slack — via **both** the button and `Ctrl+C` | §4.5 bypassing `ClipboardWriter`, or the two paths diverging |
+| 1b | Preview a capture and confirm it is the **full PNG**, not an upscaled thumbnail | §4.11 showing the lossy preview |
+| 1c | Preview a capture smaller than the window | §4.11 upscaling past 100% |
 | 2 | Scroll a 1,000+ capture library end to end | §4.3 virtualization absent or broken |
 | 3 | Capture while the window is open | §4.8 live insert |
 | 4 | Delete, then undo; delete, then let the toast expire | §4.6 ordering, orphan rows |
