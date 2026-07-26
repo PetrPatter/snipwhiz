@@ -38,6 +38,26 @@ public sealed class CaptureTileViewModel(CaptureRecord record, ThumbnailCache ca
         private set { _isMissing = value; Raise(); }
     }
 
+    /// <summary>
+    /// Drops the decoded bitmap when the tile showing this capture is recycled
+    /// onto another one.
+    ///
+    /// Without this, memory tracks how much of the library has ever been scrolled
+    /// past rather than what is on screen: a decoded 320px thumbnail is ~256 KB,
+    /// so a thousand of them is ~256 MB retained forever. Measured at 712 MB after
+    /// sweeping a 1,000-capture library. Virtualizing the containers is worthless
+    /// if the data they were bound to is never released.
+    ///
+    /// Re-showing the tile re-reads the cached JPEG, which is what the disk cache
+    /// is for.
+    /// </summary>
+    public void ReleaseThumbnail()
+    {
+        if (_thumbnail is null) return;
+        Thumbnail = null;
+        _loaded = false;
+    }
+
     public async Task EnsureThumbnailAsync(CancellationToken ct)
     {
         if (_loaded) return;

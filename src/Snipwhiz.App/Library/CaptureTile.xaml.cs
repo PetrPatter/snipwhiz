@@ -69,6 +69,11 @@ public partial class CaptureTile : System.Windows.Controls.UserControl
     {
         CancelPending();
 
+        // This container has moved on to another capture, so the previous one's
+        // bitmap is no longer displayed by anything. Releasing it here is what
+        // keeps memory tracking the realized tiles rather than the whole library.
+        if (e.OldValue is CaptureTileViewModel previous) previous.ReleaseThumbnail();
+
         if (e.NewValue is not CaptureTileViewModel tile) return;
 
         var cts = new CancellationTokenSource();

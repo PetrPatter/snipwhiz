@@ -83,13 +83,49 @@ left alone.
 place the spec had already reasoned about and got wrong.** The reasoning was
 sound when written; the premise moved underneath it.
 
+| 11 | Re-run after the fix | **PASS** — the failing case was seen passing |
+| 1b | Paste into Slack | **N/A** — not installed |
+
+### Check 17: soak
+
+Sampled every 4 s while the app was used normally against the real 25-capture
+library, then again after an automated sweep of a **1,000-capture** library.
+
+| | GDI | USER | Handles | Working set |
+|---|---|---|---|---|
+| Real library, ~2.5 min of use | 25 → 25 | 33 → 35 | 547 → 553 | 263 → 296 MB |
+| 1,000 captures, fully scrolled | 23 | 38 | 551 | **707 MB** |
+
+**GDI, USER and handle counts are flat.** That is the failure mode that takes out a
+tray app running for weeks, and it is not present.
+
+**The working set is not explained.** Two hypotheses were tested and both were
+wrong:
+
+1. *Tile view models retain decoded thumbnails forever.* Releasing the bitmap when
+   a container is recycled onto another capture moved the number by **5 MB**. The
+   change was kept — retention bounded by realized containers is right on its own
+   terms, and the disk JPEG cache makes re-showing cheap — but it is **not** what
+   accounts for the memory.
+2. *Seeding a thousand captures in the same process left its own garbage.* Running
+   a display-only process against an already-seeded library moved the number by
+   **0.3 MB**.
+
+The likeliest remaining explanation is large-object-heap garbage from a thousand
+decode/encode cycles that the runtime has not returned to the OS — which would be
+bounded rather than a leak. **That is a hypothesis, not a finding.** It was not
+measured and must not be recorded as though it were.
+
+**Next step for spec 2b:** measure the managed heap directly (`dotnet-counters
+monitor --counters System.Runtime`) and distinguish heap size from working set. If
+the heap is small and the working set is large, it is allocator behaviour; if the
+heap is large, something is genuinely retained.
+
 ## Still outstanding
 
-| # | Check | Why it needs a human |
-|---|-------|----------------------|
-| 1b | Paste into **Slack** | Paint and Chrome confirmed |
-| 11 | Re-run after the fix above | The failing case must be seen passing |
-| 17 | Soak: repeated open/scroll/capture/delete; GDI handles and working set flat | Runs for weeks |
+| # | Check | Why |
+|---|-------|-----|
+| 17b | Managed heap vs working set at 1,000+ captures | The 707 MB above is unexplained |
 
 ---
 
