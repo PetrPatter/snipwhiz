@@ -21,6 +21,7 @@ public sealed class TrayHost : IDisposable
 
     public event Action? RegionRequested;
     public event Action? FullscreenRequested;
+    public event Action? LibraryRequested;
     public event Action? CancelRequested;   // inert until Task 8 wires it to the overlay
     public event Action? ExitRequested;
 
@@ -32,6 +33,8 @@ public sealed class TrayHost : IDisposable
         var menu = new ContextMenuStrip();
         menu.Items.Add("Capture region\tCtrl+Shift+1", null, (_, _) => RegionRequested?.Invoke());
         menu.Items.Add("Capture screen\tCtrl+Shift+2", null, (_, _) => FullscreenRequested?.Invoke());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Library\tCtrl+Shift+L", null, (_, _) => LibraryRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Cancel capture", null, (_, _) => CancelRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
@@ -53,7 +56,9 @@ public sealed class TrayHost : IDisposable
             Visible = true,
             ContextMenuStrip = menu,
         };
-        _icon.DoubleClick += (_, _) => RegionRequested?.Invoke();
+        // Opens the library, not a capture: a hotkey is the natural way to capture,
+        // and a double-click is the natural way to open a window.
+        _icon.DoubleClick += (_, _) => LibraryRequested?.Invoke();
     }
 
     public void ShowBalloon(string title, string text, bool isError = false)

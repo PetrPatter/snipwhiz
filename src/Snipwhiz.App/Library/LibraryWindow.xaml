@@ -1,0 +1,68 @@
+<Window x:Class="Snipwhiz.App.Library.LibraryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Snipwhiz Library"
+        Width="1100" Height="720"
+        MinWidth="620" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#1C1B1A"
+        TextOptions.TextFormattingMode="Ideal"
+        UseLayoutRounding="True">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="Surface" Color="#1C1B1A"/>
+        <SolidColorBrush x:Key="SurfaceRaised" Color="#26241F"/>
+        <SolidColorBrush x:Key="Ink" Color="#F5F2EC"/>
+        <SolidColorBrush x:Key="InkMuted" Color="#8F8A80"/>
+        <SolidColorBrush x:Key="Accent" Color="#E8833A"/>
+    </Window.Resources>
+
+    <Grid Margin="28,20,28,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="Library"
+                       Foreground="{StaticResource Ink}"
+                       FontSize="26" FontWeight="SemiBold"
+                       VerticalAlignment="Center"/>
+
+            <Border Grid.Column="1"
+                    Background="{StaticResource SurfaceRaised}"
+                    CornerRadius="8" Padding="12,7"
+                    Width="260" HorizontalAlignment="Right">
+                <TextBox x:Name="SearchBox"
+                         Background="Transparent" BorderThickness="0"
+                         Foreground="{StaticResource Ink}"
+                         CaretBrush="{StaticResource Accent}"
+                         FontSize="13"
+                         VerticalContentAlignment="Center"/>
+            </Border>
+        </Grid>
+
+        <!-- Content: the grid lands here in Task 6 -->
+        <Grid Grid.Row="1">
+            <TextBlock x:Name="EmptyState"
+                       Text="No captures yet.&#x0a;Press Ctrl+Shift+1 to capture a region."
+                       Foreground="{StaticResource InkMuted}"
+                       FontSize="15" TextAlignment="Center" LineHeight="26"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Footer -->
+        <TextBlock x:Name="Footer"
+                   Grid.Row="2" Margin="0,16,0,0"
+                   Foreground="{StaticResource InkMuted}"
+                   FontSize="12"/>
+    </Grid>
+</Window>

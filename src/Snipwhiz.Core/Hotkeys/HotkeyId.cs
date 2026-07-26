@@ -5,4 +5,5 @@ public enum HotkeyId
     Region = 1,
     Fullscreen = 2,
     PrintScreenRegion = 3,
+    Library = 4,
 }

@@ -1,6 +1,8 @@
 using System.Windows;
+using System.Windows.Threading;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
+using Snipwhiz.App.Library;
 using Snipwhiz.Core;
 using Snipwhiz.Core.Capture;
 using Snipwhiz.Core.Geometry;
@@ -52,6 +54,7 @@ public partial class App : Application
             _tray = new TrayHost(settings, _root);
             _tray.FullscreenRequested += CaptureFullscreen;
             _tray.RegionRequested += CaptureRegion;
+            _tray.LibraryRequested += ShowLibrary;
             _tray.CancelRequested += () => _session?.Cancel();
             _tray.ExitRequested += Shutdown;
 
@@ -60,6 +63,7 @@ public partial class App : Application
             {
                 if (id == HotkeyId.Fullscreen) CaptureFullscreen();
                 else if (id is HotkeyId.Region or HotkeyId.PrintScreenRegion) CaptureRegion();
+                else if (id == HotkeyId.Library) ShowLibrary();
             };
 
             RegisterHotkeys();
@@ -85,7 +89,7 @@ public partial class App : Application
 
     private void RegisterHotkeys()
     {
-        const uint vk1 = 0x31, vk2 = 0x32;   // '1' and '2'
+        const uint vk1 = 0x31, vk2 = 0x32, vkL = 0x4C;   // '1', '2' and 'L'
         var mods = HotkeyService.ModControl | HotkeyService.ModShift;
 
         if (!_hotkeys!.TryRegister(HotkeyId.Region, mods, vk1))
@@ -95,6 +99,47 @@ public partial class App : Application
         if (!_hotkeys.TryRegister(HotkeyId.Fullscreen, mods, vk2))
             _tray!.ShowBalloon("Hotkey unavailable",
                 "Ctrl+Shift+2 is held by another application. Use the tray menu instead.", isError: true);
+
+        if (!_hotkeys.TryRegister(HotkeyId.Library, mods, vkL))
+            _tray!.ShowBalloon("Hotkey unavailable",
+                "Ctrl+Shift+L is held by another application. Open the library from the tray menu instead.",
+                isError: true);
+    }
+
+    private LibraryWindow? _library;
+
+    private void ShowLibrary()
+    {
+        _library ??= new LibraryWindow(_store!);
+        _library.Reveal();
+    }
+
+    private bool _libraryHiddenForCapture;
+
+    /// <summary>
+    /// The frozen desktop is grabbed from the live screen, so a visible library
+    /// window would be captured sitting on top of whatever the user actually
+    /// wanted. Hide it first — and always put it back, including on every abort
+    /// path, or a cancelled capture silently loses the user's window.
+    /// </summary>
+    private void HideLibraryForCapture()
+    {
+        _libraryHiddenForCapture = _library is { IsVisible: true };
+        if (!_libraryHiddenForCapture) return;
+
+        _library!.Hide();
+
+        // Hide() only queues the work. Without letting the dispatcher reach Render
+        // the grab can still find the window on screen — the negative control for
+        // this is in the task report.
+        Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+    }
+
+    private void RestoreLibraryAfterCapture()
+    {
+        if (!_libraryHiddenForCapture) return;
+        _libraryHiddenForCapture = false;
+        _library?.Reveal();
     }
 
     private void OfferPrintScreenTakeover(Settings settings)
@@ -172,13 +217,22 @@ public partial class App : Application
         }
 
         var (app, title) = ForegroundWindow.Describe();
-        var frozen = _grabber.Grab();
 
-        var cursor = frozen.Cursor;
-        var monitor = frozen.Desktop.MonitorAt(cursor.X, cursor.Y)
-                   ?? frozen.Desktop.Monitors.First(m => m.IsPrimary);
+        HideLibraryForCapture();
+        try
+        {
+            var frozen = _grabber.Grab();
 
-        Report(_pipeline!.Complete(frozen, monitor.Bounds, app, title));
+            var cursor = frozen.Cursor;
+            var monitor = frozen.Desktop.MonitorAt(cursor.X, cursor.Y)
+                       ?? frozen.Desktop.Monitors.First(m => m.IsPrimary);
+
+            Report(_pipeline!.Complete(frozen, monitor.Bounds, app, title));
+        }
+        finally
+        {
+            RestoreLibraryAfterCapture();
+        }
     }
 
     private CaptureSession? _session;
@@ -188,6 +242,8 @@ public partial class App : Application
         if (_session is not null) return;   // a capture is already in flight
 
         var (app, title) = ForegroundWindow.Describe();
+
+        HideLibraryForCapture();
         var frozen = _grabber.Grab();
 
         // Manual, re-auditable 1:1-rendering verification harness (see
@@ -201,7 +257,14 @@ public partial class App : Application
         }
 
         _session = new CaptureSession(frozen);
-        _session.Cancelled += () => { _session?.Dispose(); _session = null; };
+        // Abort() raises Aborted and then Cancel(), so every non-commit exit —
+        // Esc, right-click, watchdog, display change, focus refusal — lands here.
+        _session.Cancelled += () =>
+        {
+            _session?.Dispose();
+            _session = null;
+            RestoreLibraryAfterCapture();
+        };
 
         // Esc and right-click stay silent — the user knows they cancelled. Everything
         // else that closes the overlay does so for a reason the user cannot see, and
@@ -224,12 +287,14 @@ public partial class App : Application
             {
                 _session?.Dispose();
                 _session = null;
+                RestoreLibraryAfterCapture();
             }
         };
 
         if (!_session.Start())
         {
             _session = null;
+            RestoreLibraryAfterCapture();
             _tray!.ShowBalloon("Capture cancelled",
                 "Windows would not allow the capture overlay to take focus. Try again.", isError: true);
         }
@@ -245,6 +310,13 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // OnClosing refuses every close so the window survives being dismissed.
+        // Shutdown is the one time that has to be overridden.
+        if (_library is not null)
+        {
+            _library.AllowClose = true;
+            _library.Close();
+        }
         _session?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();
