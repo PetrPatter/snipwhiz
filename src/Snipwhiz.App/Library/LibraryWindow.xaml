@@ -58,7 +58,7 @@
       the surface reliably dark while still letting the backdrop read through it.
     -->
     <Grid Background="#B21C1B1A">
-    <Grid Margin="28,20,28,16">
+    <Grid x:Name="RootContent" Margin="28,20,28,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -135,5 +135,8 @@
                    Foreground="{StaticResource InkMuted}"
                    FontSize="12"/>
     </Grid>
+
+        <!-- Preview sits above the grid in the same window (spec 2a §4.11). -->
+        <ContentControl x:Name="PreviewHost" Margin="20,12,20,12"/>
     </Grid>
 </Window>

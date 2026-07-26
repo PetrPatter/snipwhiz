@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Snipwhiz.Core.Imaging;
 using Snipwhiz.Core.Storage;
 
@@ -30,6 +31,14 @@ public partial class LibraryWindow : Window
         _model = new LibraryViewModel(store, thumbnails);
         DataContext = _model;
 
+        _preview = new PreviewView(store);
+        _preview.Dismissed += () => RootContent.Visibility = Visibility.Visible;
+        PreviewHost.Content = _preview;
+
+        // One handler for every tile rather than plumbing a click event through
+        // the templates: find the tile the click landed in and open it.
+        RowsHost.PreviewMouseLeftButtonUp += OnGridClick;
+
         SourceInitialized += (_, _) =>
         {
             // The XAML sets Background to Transparent so the backdrop can show
@@ -55,7 +64,28 @@ public partial class LibraryWindow : Window
         SizeChanged += (_, _) => ApplyColumns();
     }
 
+    private readonly PreviewView _preview;
     private ScrollViewer? _scroller;
+
+    private void OnGridClick(object sender, MouseButtonEventArgs e)
+    {
+        var tile = FindAncestor<CaptureTile>(e.OriginalSource as DependencyObject);
+        if (tile?.DataContext is not CaptureTileViewModel model) return;
+
+        RootContent.Visibility = Visibility.Collapsed;
+        _preview.Open(model.Record);
+        _preview.Focus();
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
+    {
+        while (node is not null)
+        {
+            if (node is T match) return match;
+            node = VisualTreeHelper.GetParent(node);
+        }
+        return null;
+    }
 
     /// <summary>
     /// Pixels moved per wheel notch. WPF's own step is tuned for text lines and
@@ -115,10 +145,20 @@ public partial class LibraryWindow : Window
     {
         if (e.Key == Key.Escape)
         {
-            Hide();
+            // Esc backs out one level: preview first, then the window.
+            if (_preview.IsOpen) _preview.Close();
+            else Hide();
             e.Handled = true;
             return;
         }
+
+        if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control && _preview.IsOpen)
+        {
+            _preview.CopyToClipboard();
+            e.Handled = true;
+            return;
+        }
+
         base.OnKeyDown(e);
     }
 
