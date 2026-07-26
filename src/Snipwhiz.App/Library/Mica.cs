@@ -39,4 +39,42 @@ internal static class Mica
             return darkOk && backdropOk;
         }
     }
+
+    /// <summary>
+    /// Turns off the open/close animation for this window.
+    ///
+    /// The library hides itself before a capture, but Windows fades it out rather
+    /// than removing it, so the grab caught it mid-fade and the screenshot
+    /// contained a translucent library. With transitions off, Hide is immediate
+    /// and there is no fade to race.
+    /// </summary>
+    public static void DisableTransitions(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return;
+
+        var disable = 1;
+        unsafe
+        {
+            PInvoke.DwmSetWindowAttribute(
+                (HWND)hwnd, DWMWINDOWATTRIBUTE.DWMWA_TRANSITIONS_FORCEDISABLED,
+                &disable, sizeof(int));
+        }
+    }
+
+    /// <summary>
+    /// Blocks until the compositor has presented the current frame.
+    ///
+    /// Hiding a window only queues the work; the dispatcher reaching Render says
+    /// nothing about what DWM has actually composited to the screen, and the
+    /// capture reads the screen. This is the one call that answers the question
+    /// the capture is really asking.
+    /// </summary>
+    public static void WaitForCompositor()
+    {
+        try { PInvoke.DwmFlush(); }
+        catch (Exception e) when (e is EntryPointNotFoundException or DllNotFoundException)
+        {
+            // Composition disabled — nothing to wait for.
+        }
+    }
 }

@@ -65,8 +65,13 @@ public partial class LibraryWindow : Window
             // The XAML sets Background to Transparent so the backdrop can show
             // through. If the compositor refuses it that would leave a see-through
             // window, so the flat fallback is applied here.
-            if (!Mica.TryApply(new WindowInteropHelper(this).Handle))
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (!Mica.TryApply(hwnd))
                 Background = (System.Windows.Media.Brush)FindResource("Surface");
+
+            // So hiding for a capture is instant rather than a fade the grab can
+            // catch halfway through.
+            Mica.DisableTransitions(hwnd);
         };
 
         Loaded += (_, _) =>

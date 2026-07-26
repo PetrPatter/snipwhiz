@@ -33,7 +33,7 @@ internal static class ClipboardCopier
         {
             try
             {
-                ClipboardWriter.Write(PngDecoder.Decode(path));
+                ClipboardWriter.Write(PngDecoder.Decode(path), path);
                 return CopyResult.Copied;
             }
             catch (ClipboardUnavailableException)

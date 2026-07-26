@@ -135,10 +135,12 @@ public partial class App : Application
 
         _library!.Hide();
 
-        // Hide() only queues the work. Without letting the dispatcher reach Render
-        // the grab can still find the window on screen — the negative control for
-        // this is in the task report.
+        // Hide only queues the work, and the dispatcher reaching Render says
+        // nothing about what the compositor has actually put on screen — which is
+        // what the grab reads. Pumping alone left a translucent library in the
+        // capture; DwmFlush waits for the frame that no longer contains it.
         Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+        Mica.WaitForCompositor();
     }
 
     private void RestoreLibraryAfterCapture()

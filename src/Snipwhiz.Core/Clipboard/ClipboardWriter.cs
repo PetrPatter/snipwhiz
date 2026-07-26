@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using Snipwhiz.Core.Capture;
 using Snipwhiz.Core.Imaging;
 using Windows.Win32;
@@ -14,6 +15,7 @@ public static class ClipboardWriter
 {
     private const uint CF_DIB = 8;
     private const uint CF_DIBV5 = 17;
+    private const uint CF_HDROP = 15;
     private const int MaxAttempts = 8;
     private const int RetryDelayMs = 60;
 
@@ -22,7 +24,13 @@ public static class ClipboardWriter
     /// modern apps prefer PNG, DIBV5 carries alpha, and supplying CF_DIB stops
     /// Windows synthesising a wrong one from the others.
     /// </summary>
-    public static unsafe void Write(CroppedImage image)
+    /// <param name="filePath">
+    /// When given, the capture is also published as a file (CF_HDROP). Consumers
+    /// that take a file rather than a bitmap — terminals, Explorer, file pickers,
+    /// "attach" fields — see nothing at all without this. Measured against
+    /// Win+Shift+S, which publishes only file formats and no bitmap of its own.
+    /// </param>
+    public static unsafe void Write(CroppedImage image, string? filePath = null)
     {
         var png = PngEncoder.Encode(image.Bgra, image.Width, image.Height);
         var pngFormat = PInvoke.RegisterClipboardFormat("PNG");
@@ -45,6 +53,12 @@ public static class ClipboardWriter
             SetBytes(pngFormat, png);
             SetBytes(CF_DIBV5, BuildDibV5(image));
             SetBytes(CF_DIB, BuildDib(image));
+
+            // Only when the file is genuinely there. Advertising a path that does
+            // not exist gives the consumer a paste that fails rather than one that
+            // was never offered.
+            if (filePath is not null && File.Exists(filePath))
+                SetBytes(CF_HDROP, BuildHDrop(filePath));
         }
         finally
         {
@@ -81,6 +95,24 @@ public static class ClipboardWriter
         {
             if (!ok) PInvoke.GlobalFree((HGLOBAL)handle);
         }
+    }
+
+    /// <summary>
+    /// A DROPFILES header followed by the path as UTF-16, double-null terminated.
+    /// The list is always one file, but the format is a list, so the second null
+    /// is what marks its end — omit it and consumers read past the buffer.
+    /// </summary>
+    private static byte[] BuildHDrop(string path)
+    {
+        const int headerSize = 20;   // DWORD pFiles + POINT pt + BOOL fNC + BOOL fWide
+        var list = path + "\0\0";
+        var buffer = new byte[headerSize + Encoding.Unicode.GetByteCount(list)];
+
+        BitConverter.TryWriteBytes(buffer.AsSpan(0), headerSize);   // offset to the list
+        BitConverter.TryWriteBytes(buffer.AsSpan(16), 1);           // fWide: the path is UTF-16
+        Encoding.Unicode.GetBytes(list, 0, list.Length, buffer, headerSize);
+
+        return buffer;
     }
 
     private static unsafe byte[] BuildDibV5(CroppedImage image)
