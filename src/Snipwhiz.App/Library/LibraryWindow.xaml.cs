@@ -102,7 +102,10 @@ public partial class LibraryWindow : Window
             RefreshFooter();
 
             if (Diagnostics.GridVerification.IsEnabled && _scroller is not null)
-                Diagnostics.GridVerification.Sweep(RowsHost, _scroller, () => _model.Count);
+                Diagnostics.GridVerification.Sweep(RowsHost, _scroller,
+                    () => _model.Count, () => _model.RetainedThumbnails);
+
+            Diagnostics.ResizeVerification.Run(this, RowsHost);
         };
 
         SizeChanged += (_, _) => ApplyColumns();

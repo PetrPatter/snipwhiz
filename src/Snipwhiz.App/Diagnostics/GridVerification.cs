@@ -52,7 +52,8 @@ internal static class GridVerification
     /// Scrolls to the bottom in viewport-sized steps, sampling as it goes, then
     /// writes the report.
     /// </summary>
-    public static void Sweep(ItemsControl host, ScrollViewer scroller, Func<int> loadedCaptures)
+    public static void Sweep(ItemsControl host, ScrollViewer scroller,
+                             Func<int> loadedCaptures, Func<int> retainedThumbnails)
     {
         if (!IsEnabled) return;
 
@@ -84,7 +85,7 @@ internal static class GridVerification
             if ((atBottom && stalls >= 3) || samples > 400)
             {
                 timer.Stop();
-                Write(peak, samples, loadedCaptures(), scroller);
+                Write(peak, samples, loadedCaptures(), retainedThumbnails(), scroller);
                 return;
             }
 
@@ -95,11 +96,21 @@ internal static class GridVerification
         timer.Start();
     }
 
-    private static void Write(int peak, int samples, int loaded, ScrollViewer scroller)
+    private static void Write(int peak, int samples, int loaded, int retained, ScrollViewer scroller)
     {
         var mode = BreakVirtualization
             ? "NEGATIVE CONTROL (plain StackPanel — virtualization deliberately off)"
             : "POSITIVE (VirtualizingStackPanel, recycling)";
+
+        // Forced, blocking, and after finalizers so anything merely awaiting
+        // collection is not counted as retained. Separates "the heap is holding
+        // it" from "the allocator has not handed it back to the OS".
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var managed = GC.GetTotalMemory(forceFullCollection: true);
+        using var self = System.Diagnostics.Process.GetCurrentProcess();
 
         File.WriteAllText(ResultPath,
             $"mode={mode}\n" +
@@ -109,8 +120,17 @@ internal static class GridVerification
             $"viewportHeight={scroller.ViewportHeight:F0}\n" +
             $"extentHeight={scroller.ExtentHeight:F0}\n" +
             "\n" +
+            $"retainedThumbnails={retained}\n" +
+            $"managedHeapMB={managed / 1024.0 / 1024:F1}\n" +
+            $"workingSetMB={self.WorkingSet64 / 1024.0 / 1024:F1}\n" +
+            $"privateMB={self.PrivateMemorySize64 / 1024.0 / 1024:F1}\n" +
+            "\n" +
             "Virtualizing: peak is a small multiple of one screenful and does not\n" +
-            "track capturesLoaded. Not virtualizing: peak approaches capturesLoaded.\n");
+            "track capturesLoaded. Not virtualizing: peak approaches capturesLoaded.\n" +
+            "\n" +
+            "retainedThumbnails should also track the screenful, not the library.\n" +
+            "If it tracks capturesLoaded, the containers are virtualized but the\n" +
+            "bitmaps they were bound to are not being released.\n");
     }
 
     private static int CountTiles(DependencyObject root)

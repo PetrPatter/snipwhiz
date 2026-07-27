@@ -16,6 +16,25 @@ public sealed class CaptureTileViewModel(CaptureRecord record, ThumbnailCache ca
     private ImageSource? _thumbnail;
     private bool _isMissing;
     private bool _loaded;
+    private int _bindings;
+
+    /// <summary>
+    /// How many live tiles are currently showing this capture.
+    ///
+    /// One view model is shared by every tile that ever displays this capture —
+    /// <see cref="LibraryViewModel"/> keys them by id — so "has the tile that
+    /// decoded this gone away?" is the wrong question to ask before dropping the
+    /// bitmap. During a resize the old container is discarded and a new one binds
+    /// the same view model, and answering the wrong question released the bitmap
+    /// the new tile had just finished decoding.
+    ///
+    /// UI thread only, which is where bind and release both run.
+    /// </summary>
+    public bool IsBound => _bindings > 0;
+
+    public void AddBinding() => _bindings++;
+
+    public void RemoveBinding() => _bindings--;
 
     public CaptureRecord Record => record;
 
@@ -39,14 +58,18 @@ public sealed class CaptureTileViewModel(CaptureRecord record, ThumbnailCache ca
     }
 
     /// <summary>
-    /// Drops the decoded bitmap when the tile showing this capture is recycled
-    /// onto another one.
+    /// Drops the decoded bitmap when the tile showing this capture leaves the
+    /// visual tree. Called from <c>CaptureTile.Release</c>, which documents why
+    /// that is the only workable trigger.
     ///
     /// Without this, memory tracks how much of the library has ever been scrolled
     /// past rather than what is on screen: a decoded 320px thumbnail is ~256 KB,
-    /// so a thousand of them is ~256 MB retained forever. Measured at 712 MB after
-    /// sweeping a 1,000-capture library. Virtualizing the containers is worthless
-    /// if the data they were bound to is never released.
+    /// so a thousand of them is ~256 MB retained forever. Note that those pixels
+    /// live in unmanaged WIC memory, not on the GC heap — the 1,000-capture sweep
+    /// measured a 714 MB working set against a 4.3 MB managed heap, so heap size
+    /// says nothing useful here and <c>retainedThumbnails</c> is the number to
+    /// watch. Virtualizing the containers is worthless if the data they were
+    /// bound to is never released.
     ///
     /// Re-showing the tile re-reads the cached JPEG, which is what the disk cache
     /// is for.
