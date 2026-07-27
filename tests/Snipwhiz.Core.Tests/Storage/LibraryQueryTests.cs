@@ -143,6 +143,73 @@ public class LibraryQueryTests : IDisposable
     }
 
     [Fact]
+    public void SetEditPaths_records_the_result_of_a_save()
+    {
+        using var db = OpenDb();
+        var seeded = LibrarySeeder.Seed(db, 1);
+        var edited = new DateTimeOffset(2026, 7, 27, 9, 30, 0, TimeSpan.Zero);
+
+        db.SetEditPaths(seeded[0].Id, "projects/x.ssproj", "flat/x.png", 220, 130, edited);
+
+        var row = db.Page(null, 10).Single();
+        Assert.Equal("projects/x.ssproj", row.ProjectPath);
+        Assert.Equal("flat/x.png", row.FlatPath);
+        Assert.Equal(220, row.FlatWidth);
+        Assert.Equal(130, row.FlatHeight);
+        Assert.Equal(edited, row.EditedUtc);
+    }
+
+    [Fact]
+    public void A_failed_flatten_leaves_the_project_recorded_and_no_render()
+    {
+        // Spec 2b §4.12: the project is still committed when the render fails, so
+        // the capture keeps its annotations and the library falls back to the
+        // original. A NOT NULL on flat_path would break exactly this.
+        using var db = OpenDb();
+        var seeded = LibrarySeeder.Seed(db, 1);
+
+        db.SetEditPaths(seeded[0].Id, "projects/x.ssproj", null, null, null, DateTimeOffset.UnixEpoch);
+
+        var row = db.Page(null, 10).Single();
+        Assert.Equal("projects/x.ssproj", row.ProjectPath);
+        Assert.Null(row.FlatPath);
+    }
+
+    [Fact]
+    public void Deleting_an_edited_capture_and_undoing_keeps_it_joined_to_its_annotations()
+    {
+        // Undo-of-delete re-inserts a record that came back out of this table. A
+        // column dropped by Insert severs the capture from its .ssproj silently,
+        // and nothing surfaces it until someone opens the editor and finds their
+        // work gone.
+        using var db = OpenDb();
+        var seeded = LibrarySeeder.Seed(db, 1);
+        db.SetEditPaths(seeded[0].Id, "projects/x.ssproj", "flat/x.png", 220, 130,
+                        DateTimeOffset.FromUnixTimeMilliseconds(1_753_600_000_000));
+
+        var before = db.Page(null, 10).Single();
+        db.Delete(before.Id);
+        db.Insert(before);                       // the undo path
+
+        Assert.Equal(before, db.Page(null, 10).Single());
+    }
+
+    [Fact]
+    public void Editing_a_capture_does_not_move_it_in_the_library()
+    {
+        // Spec 2b §5: edited_utc is stored but is not an ordering key. The library
+        // is a record of when captures were taken.
+        using var db = OpenDb();
+        var seeded = LibrarySeeder.Seed(db, 3);
+        var middle = seeded[1];
+
+        db.SetEditPaths(middle.Id, "projects/x.ssproj", "flat/x.png", 10, 10, DateTimeOffset.UtcNow);
+
+        // Seeded oldest-first, so newest-first is the reverse of insertion order.
+        Assert.Equal(seeded.Select(r => r.Id).Reverse(), db.Page(null, 10).Select(r => r.Id));
+    }
+
+    [Fact]
     public void Count_matches_the_number_of_rows()
     {
         using var db = OpenDb();
