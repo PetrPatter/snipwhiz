@@ -80,9 +80,9 @@ public partial class App : Application
 
             RegisterHotkeys();
 
-            // The grid gate drives its own scroll sweep, so it needs the window
-            // open without waiting for someone to press the hotkey.
-            if (Diagnostics.GridVerification.IsEnabled)
+            // The grid and resize gates drive the window themselves, so they need
+            // it open without waiting for someone to press the hotkey.
+            if (Diagnostics.GridVerification.IsEnabled || Diagnostics.ResizeVerification.IsEnabled)
             {
                 ShowLibrary();
                 return;

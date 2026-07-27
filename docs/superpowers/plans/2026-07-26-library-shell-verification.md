@@ -99,33 +99,80 @@ library, then again after an automated sweep of a **1,000-capture** library.
 **GDI, USER and handle counts are flat.** That is the failure mode that takes out a
 tray app running for weeks, and it is not present.
 
-**The working set is not explained.** Two hypotheses were tested and both were
-wrong:
+The working set was left unexplained here, with two wrong hypotheses recorded —
+that the release-on-recycle change accounted for it (it moved 5 MB), and that
+seeding left its own garbage (0.3 MB). It has since been diagnosed and fixed.
 
-1. *Tile view models retain decoded thumbnails forever.* Releasing the bitmap when
-   a container is recycled onto another capture moved the number by **5 MB**. The
-   change was kept — retention bounded by realized containers is right on its own
-   terms, and the disk JPEG cache makes re-showing cheap — but it is **not** what
-   accounts for the memory.
-2. *Seeding a thousand captures in the same process left its own garbage.* Running
-   a display-only process against an already-seeded library moved the number by
-   **0.3 MB**.
+### Check 17b: the 707 MB, resolved
 
-The likeliest remaining explanation is large-object-heap garbage from a thousand
-decode/encode cycles that the runtime has not returned to the OS — which would be
-bounded rather than a leak. **That is a hypothesis, not a finding.** It was not
-measured and must not be recorded as though it were.
+**A real defect, not allocator behaviour.** `retainedThumbnails` was added to the
+grid gate — a count of tile view models still holding a decoded bitmap — and the
+seeded 1,000-capture sweep re-run.
 
-**Next step for spec 2b:** measure the managed heap directly (`dotnet-counters
-monitor --counters System.Runtime`) and distinguish heap size from working set. If
-the heap is small and the working set is large, it is allocator behaviour; if the
-heap is large, something is genuinely retained.
+| | retained | managed heap | working set | private |
+|---|---|---|---|---|
+| Before | **1000** | 4.3 MB | 708.7 MB | 612.7 MB |
+| After | **10** | 3.1 MB | **187.3 MB** | **90.1 MB** |
 
-## Still outstanding
+`realizedTilesPeak` was 21 in both runs: the *containers* were always virtualized
+correctly. What was never bounded was the pixel data they had been bound to.
 
-| # | Check | Why |
-|---|-------|-----|
-| 17b | Managed heap vs working set at 1,000+ captures | The 707 MB above is unexplained |
+**Two things made this hard to see.**
+
+The managed heap reads 4.3 MB even with a thousand live bitmaps, because
+`BitmapImage` keeps decoded pixels in unmanaged WIC memory. Heap size says nothing
+here — the `dotnet-counters` step planned above would have shown a small heap and
+been read as exoneration. `retainedThumbnails` is the number that matters, and it
+is now part of the permanent grid report.
+
+And `ReleaseThumbnail()` was dead code from the day it was written. It was called
+from `OnDataContextChanged` when `e.OldValue` was a view model, which never happens:
+tiles sit in a non-virtualizing per-row `ItemsControl`, so when the outer panel
+recycles a row the inner control *regenerates* its children rather than rebinding
+them. Instrumenting the sweep showed 1,004 tiles constructed, 1,004 DataContext
+changes, and **0** with an old view model.
+
+Moving the release to `Unloaded` was still not enough — 993 unloads, 0 releases.
+WPF severs the inherited DataContext when it disconnects a container, without
+raising `DataContextChanged` on the tile, so `Unloaded` sees a DataContext that no
+longer holds the view model. The release now uses `_boundTo`, captured at bind time.
+`Loaded` is a second bind trigger so a tile released while unloaded and then
+re-shown with the same capture cannot stay blank; `_boundTo` keeps the two triggers
+from racing on first display.
+
+**The gate has been observed failing.** `retainedThumbnails=1000` on the pre-fix
+build is its negative control.
+
+**The fix regressed the UI twice, and the grid sweep caught neither.** Tiles went
+black on window resize and came back only after scrolling. Resizing changes the
+column count, which rebuilds every row, so every tile on screen is discarded and
+rebuilt while remaining visible.
+
+1. *Released immediately on unload.* A capture that stays on screen throughout is
+   briefly held by nothing, and no DataContext transition follows to re-request it.
+2. *Deferred, but checking whether **this element** survived.* One view model is
+   shared by every tile that shows a capture — `LibraryViewModel._tiles` keys them
+   by id — so the discarded tile's deferred release dropped the bitmap the
+   replacement tile had just finished decoding.
+
+The release now counts **bindings on the view model** and defers to Background
+priority: a bitmap is dropped only when no live tile is claiming it. Retention is
+unchanged at 11.
+
+### The gate the sweep could not be
+
+The grid sweep scrolls one direction and never resizes, so it measures retention and
+says nothing about whether anything is still *displayed*. Both regressions passed it
+cleanly. `Diagnostics/ResizeVerification.cs` closes that gap: it drives the window
+through several widths and counts realized tiles showing nothing.
+
+| Run | realizedTiles | blankTiles |
+|---|---|---|
+| `SNIPWHIZ_VERIFY_BREAK_RELEASE=1` (release on detach) | 12 | **2** |
+| Positive | 12 | **0** |
+
+The negative control reproduces the reported bug, so the gate is known to detect it
+rather than merely known to pass.
 
 ---
 

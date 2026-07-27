@@ -24,6 +24,13 @@ public sealed class LibraryViewModel(CaptureStore store, ThumbnailCache cache)
 
     public int Count => _records.Count;
 
+    /// <summary>
+    /// How many tile view models are still holding a decoded bitmap. Diagnostic
+    /// only: virtualization bounds the <i>containers</i>, and this is what says
+    /// whether it also bounds the pixels they were bound to.
+    /// </summary>
+    public int RetainedThumbnails => _tiles.Values.Count(t => t.Thumbnail is not null);
+
     public void SetColumns(int columns)
     {
         columns = Math.Max(1, columns);
