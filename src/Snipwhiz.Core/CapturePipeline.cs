@@ -40,12 +40,12 @@ public static class ForegroundWindow
     }
 }
 
-public sealed class CapturePipeline(CaptureStore store, Action<CroppedImage>? writeClipboard = null)
+public sealed class CapturePipeline(CaptureStore store, Action<CroppedImage, string?>? writeClipboard = null)
 {
     // Seam, not an abstraction: ClipboardWriter is static and touches
     // process-global Win32 state, so the ordering rule below is otherwise
     // unprovable except by hand.
-    private readonly Action<CroppedImage> _writeClipboard = writeClipboard ?? ClipboardWriter.Write;
+    private readonly Action<CroppedImage, string?> _writeClipboard = writeClipboard ?? ClipboardWriter.Write;
 
     public CaptureOutcome Complete(FrozenDesktop frozen, PixelRect region, string sourceApp, string sourceTitle)
     {
@@ -58,18 +58,13 @@ public sealed class CapturePipeline(CaptureStore store, Action<CroppedImage>? wr
             warning = "The capture came back black. DRM-protected content cannot be captured by any "
                     + "screenshot tool; fullscreen games must be switched to windowed mode.";
 
-        // Clipboard first — it must not block on disk I/O.
-        var clipboardOk = true;
-        try
-        {
-            _writeClipboard(image);
-        }
-        catch (ClipboardUnavailableException e)
-        {
-            clipboardOk = false;
-            warning ??= $"Could not copy to the clipboard: {e.Message}";
-        }
-
+        // Disk first, then the clipboard — the reverse of spec 1 §4.10, and
+        // deliberately so. The clipboard payload includes the capture as a file
+        // (CF_HDROP), which is the only format terminals, Explorer and file
+        // pickers accept; Win+Shift+S publishes file formats and no bitmap at all.
+        // A file cannot be advertised before it exists, so the ordering had to
+        // give. The cost is that the paste becomes available after the PNG is
+        // written rather than before — milliseconds, unless the disk is stalled.
         CaptureRecord? record = null;
         var saveOk = true;
         try
@@ -83,7 +78,20 @@ public sealed class CapturePipeline(CaptureStore store, Action<CroppedImage>? wr
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or SqliteException)
         {
             saveOk = false;
-            warning ??= $"Copied to the clipboard, but saving to disk failed: {e.Message}";
+            warning ??= $"Saving to disk failed: {e.Message}";
+        }
+
+        var clipboardOk = true;
+        try
+        {
+            // No record means no file, so the image formats go out alone rather
+            // than advertising a path that was never written.
+            _writeClipboard(image, record is null ? null : store.ResolvePath(record));
+        }
+        catch (ClipboardUnavailableException e)
+        {
+            clipboardOk = false;
+            warning ??= $"Could not copy to the clipboard: {e.Message}";
         }
 
         return new CaptureOutcome(record, clipboardOk, saveOk, image.HasUncoveredPixels, warning);

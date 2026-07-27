@@ -25,6 +25,15 @@ public sealed class CaptureStore : IDisposable
 
     public int SchemaVersion => _db.SchemaVersion;
 
+    public string Root => _root;
+
+    /// <summary>
+    /// <see cref="CaptureRecord.FilePath"/> is relative to the store root so the
+    /// folder stays movable, which means nothing outside this class can open a
+    /// capture without this.
+    /// </summary>
+    public string ResolvePath(CaptureRecord record) => Path.Combine(_root, record.FilePath);
+
     public static string DefaultRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Snipwhiz");
 
@@ -65,6 +74,31 @@ public sealed class CaptureStore : IDisposable
     }
 
     public IReadOnlyList<CaptureRecord> Recent(int limit) => _db.Recent(limit);
+
+    public IReadOnlyList<CaptureRecord> Page(CaptureRecord? after, int limit) => _db.Page(after, limit);
+
+    public IReadOnlyList<CaptureRecord> Search(string query, int limit) => _db.Search(query, limit);
+
+    /// <summary>Removes the row only. The caller owns the files — see spec 2a §4.7.</summary>
+    public bool Delete(Guid id) => _db.Delete(id);
+
+    public void Insert(CaptureRecord record) => _db.Insert(record);
+
+    public int Count() => _db.Count();
+
+    /// <summary>
+    /// Size of the captures folder. Not a query — the schema has no size column —
+    /// and deliberately scoped to <c>captures/</c> so the database, its WAL and
+    /// the thumbnail cache are excluded.
+    /// </summary>
+    public long TotalBytes()
+    {
+        var dir = Path.Combine(_root, "captures");
+        if (!Directory.Exists(dir)) return 0;
+        return new DirectoryInfo(dir)
+            .EnumerateFiles("*", SearchOption.AllDirectories)
+            .Sum(f => f.Length);
+    }
 
     public void Dispose() => _db.Dispose();
 }

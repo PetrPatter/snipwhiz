@@ -74,7 +74,7 @@ public class CaptureStoreTests : IDisposable
     {
         using var store = new CaptureStore(_root);
         store.Save(Image(), "a", "t");
-        Assert.Equal(1, store.SchemaVersion);
+        Assert.Equal(2, store.SchemaVersion);
     }
 
     [Fact]

@@ -1,0 +1,83 @@
+<UserControl x:Class="Snipwhiz.App.Library.CaptureTile"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="252" Margin="0,0,16,16"
+             Cursor="Hand">
+
+    <!--
+      Declared here, not in the window. StaticResource is resolved when this
+      control is parsed, which happens before it is attached to the window's
+      tree - so a converter living in Window.Resources is simply not found and
+      the whole template throws.
+    -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </UserControl.Resources>
+
+    <Border x:Name="Card" CornerRadius="10" Padding="0"
+            BorderThickness="1.5">
+        <!--
+          Background and BorderBrush are set only by the style. A local value on
+          the element would win over a style setter and the hover trigger would
+          silently do nothing.
+        -->
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Background" Value="#26241F"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Style.Triggers>
+                    <DataTrigger Value="True"
+                                 Binding="{Binding IsMouseOver,
+                                           RelativeSource={RelativeSource AncestorType=UserControl}}">
+                        <Setter Property="Background" Value="#332F28"/>
+                        <Setter Property="BorderBrush" Value="#E8833A"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+
+        <StackPanel x:Name="CardContent">
+            <!-- Fixed box so rows have a uniform height; the panel virtualizes
+                 by row, and ragged row heights make its scroll estimates wrong. -->
+            <Grid Height="150" Background="#141312">
+                <Image x:Name="Thumb"
+                       Source="{Binding Thumbnail}"
+                       Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Visibility="{Binding IsMissing,
+                                         Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="File missing"
+                               Foreground="#C9C3B8" FontSize="12"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Dimensions}"
+                               Foreground="#6E6960" FontSize="11" Margin="0,4,0,0"
+                               HorizontalAlignment="Center"/>
+                    <Button x:Name="RemoveButton"
+                            Content="Remove from library"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="#E8833A" FontSize="11"
+                            Margin="0,8,0,0" Padding="6,3" Cursor="Hand"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid Margin="12,9,12,11">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Caption}"
+                           Foreground="#F5F2EC" FontSize="12"
+                           TextTrimming="CharacterEllipsis"/>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding TakenAt}"
+                           Foreground="#8F8A80" FontSize="11"
+                           Margin="8,0,0,0"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>
