@@ -155,8 +155,20 @@ public partial class LibraryWindow : Window
     /// <summary>Forwarded from the editor so App can own the save pipeline.</summary>
     public event Action<CaptureRecord, SceneDocument, BitmapSource>? EditorSaveRequested;
 
-    /// <summary>A save finished. Task 12 makes the tile show it.</summary>
-    public void OnEditSaved(CaptureRecord saved) => _editor?.OnSaved(saved);
+    /// <summary>
+    /// A save finished: point the editor and the grid at the capture as it now
+    /// stands, and let the tile re-fetch its thumbnail.
+    ///
+    /// <para>The cached JPEG was already deleted by the save pipeline. That alone
+    /// changes nothing on screen — the tile view model latches once loaded and is
+    /// never rebuilt — which is why the refresh is pushed rather than waited for.</para>
+    /// </summary>
+    public void OnEditSaved(CaptureRecord saved)
+    {
+        _editor?.OnSaved(saved);
+        if (Diagnostics.RefreshVerification.BreakRefresh) return;
+        _model.Replace(saved);
+    }
 
     private void ShowLibraryScreen()
     {

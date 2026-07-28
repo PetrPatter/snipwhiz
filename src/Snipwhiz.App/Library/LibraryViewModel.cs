@@ -123,6 +123,23 @@ public sealed class LibraryViewModel(CaptureStore store, ThumbnailCache cache)
         Rebuild();
     }
 
+    /// <summary>
+    /// Swaps in a capture that has just been saved from the editor.
+    ///
+    /// <para>Both places that hold it have to change: <c>_records</c>, because it
+    /// carries the keyset paging cursor and would otherwise hand back a row whose
+    /// columns are out of date, and the tile, because it decides between the render
+    /// and the original from the record it holds.</para>
+    /// </summary>
+    public void Replace(CaptureRecord updated)
+    {
+        var index = _records.FindIndex(r => r.Id == updated.Id);
+        if (index < 0) return;
+        _records[index] = updated;
+
+        if (_tiles.TryGetValue(updated.Id, out var tile)) tile.Refresh(updated);
+    }
+
     public void Remove(Guid id)
     {
         _records.RemoveAll(r => r.Id == id);
