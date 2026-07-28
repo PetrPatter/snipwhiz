@@ -35,5 +35,10 @@ public sealed class UnknownAnnotation : Annotation
 
     protected override bool HitTestLocal(Point local, double tolerance) => false;
 
+    /// <summary>Nothing to capture: this object cannot be selected, so it cannot be reshaped.</summary>
+    public override GeometryState CaptureGeometry() => new OpaqueGeometryState();
+
+    public override void RestoreGeometry(GeometryState state) { }
+
     public override void Render(DrawingContext dc) { }
 }

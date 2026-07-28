@@ -54,6 +54,21 @@ public abstract class Annotation
     protected abstract bool HitTestLocal(Point local, double tolerance);
 
     /// <summary>
+    /// This object's own shape, as a value that can be put back later.
+    ///
+    /// <para>Exists because <see cref="Transform"/> carries no scale, so resizing
+    /// edits geometry — and undo therefore needs to capture geometry. One pair of
+    /// methods per type keeps that to a single <c>Reshape</c> command rather than
+    /// one command per shape.</para>
+    ///
+    /// <para>The state is a value, not a reference into the object: it is held by
+    /// an undo entry that may outlive several edits.</para>
+    /// </summary>
+    public abstract GeometryState CaptureGeometry();
+
+    public abstract void RestoreGeometry(GeometryState state);
+
+    /// <summary>
     /// Whether an image-space point lands on this object.
     ///
     /// <para>The point is pulled back through the <b>inverse</b> transform rather

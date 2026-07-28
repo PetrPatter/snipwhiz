@@ -52,6 +52,11 @@ public sealed class RectangleAnnotation : Annotation
         return hit.Contains(local);
     }
 
+    public override GeometryState CaptureGeometry() => new RectangleGeometryState(Size);
+
+    public override void RestoreGeometry(GeometryState state) =>
+        Size = ((RectangleGeometryState)state).Size;
+
     public override void Render(DrawingContext dc)
     {
         dc.PushTransform(new MatrixTransform(Transform));
