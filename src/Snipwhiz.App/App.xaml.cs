@@ -80,6 +80,14 @@ public partial class App : Application
 
             RegisterHotkeys();
 
+            // Stands up its own window and closes it; nothing else in the app is
+            // involved, so it runs before the library gates and returns.
+            if (Diagnostics.CanvasVerification.IsEnabled)
+            {
+                Diagnostics.CanvasVerification.RunIfRequested();
+                return;
+            }
+
             // The grid and resize gates drive the window themselves, so they need
             // it open without waiting for someone to press the hotkey.
             if (Diagnostics.GridVerification.IsEnabled || Diagnostics.ResizeVerification.IsEnabled)
