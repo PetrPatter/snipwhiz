@@ -32,17 +32,57 @@ public sealed class CanvasHost : FrameworkElement
     private readonly DrawingVisual _backdrop = new();
     private readonly Dictionary<Annotation, DrawingVisual> _visuals = [];
 
+    /// <summary>
+    /// Handles and marquee, deliberately <b>outside</b> the view transform.
+    ///
+    /// <para>Drawn in element coordinates so a grab handle is the same size under
+    /// the mouse at 10% and at 800%. Inside the transform they would scale with the
+    /// image, and their stroke widths with them.</para>
+    /// </summary>
+    private readonly DrawingVisual _overlay = new();
+
     private BitmapSource? _source;
     private SceneDocument? _document;
     private double _zoom = 1;
     private Vector _pan;
 
+    private readonly ContainerVisual _layers = new();
+
     public CanvasHost()
     {
-        AddVisualChild(_root);
+        AddVisualChild(_layers);
+        _layers.Children.Add(_root);
+        _layers.Children.Add(_overlay);
         _root.Children.Add(_backdrop);
         ClipToBounds = true;
         Focusable = true;
+    }
+
+    /// <summary>The objects currently selected, topmost-last.</summary>
+    public IReadOnlyList<Annotation> Selection => _selection;
+
+    private readonly List<Annotation> _selection = [];
+
+    /// <summary>Rubber band in element coordinates while one is being dragged.</summary>
+    public Rect? Marquee { get; set; }
+
+    public event Action? SelectionChanged;
+
+    public void SetSelection(IEnumerable<Annotation> annotations)
+    {
+        _selection.Clear();
+        _selection.AddRange(annotations);
+        RefreshOverlay();
+        SelectionChanged?.Invoke();
+    }
+
+    public void ClearSelection() => SetSelection([]);
+
+    /// <summary>Redraws handles and marquee. Cheap: one visual, whatever the scene holds.</summary>
+    public void RefreshOverlay()
+    {
+        using var dc = _overlay.RenderOpen();
+        SelectionOverlay.Render(dc, this, _selection, Marquee);
     }
 
     /// <summary>
@@ -64,7 +104,7 @@ public sealed class CanvasHost : FrameworkElement
 
     protected override int VisualChildrenCount => 1;
 
-    protected override Visual GetVisualChild(int index) => _root;
+    protected override Visual GetVisualChild(int index) => _layers;
 
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -220,6 +260,8 @@ public sealed class CanvasHost : FrameworkElement
         view.Scale(_zoom, _zoom);
         view.Translate(_pan.X, _pan.Y);
         _root.Transform = new MatrixTransform(view);
+        // Handles are positioned from image space, so they move when the view does.
+        RefreshOverlay();
     }
 
     // ---- navigation input -------------------------------------------------

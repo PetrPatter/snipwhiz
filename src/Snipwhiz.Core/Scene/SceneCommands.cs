@@ -102,6 +102,45 @@ public sealed class ReshapeAnnotation(Annotation annotation, GeometryState befor
     }
 }
 
+/// <summary>
+/// Resizes an object by a handle, which moves it as well: the corner opposite the
+/// handle is the anchor, so the centre shifts.
+///
+/// <para>One command rather than a <see cref="ReshapeAnnotation"/> plus a
+/// <see cref="MoveAnnotation"/>, because a drag applying both per step would push
+/// alternating entries onto the stack and neither could ever absorb the other —
+/// forty mouse-moves would cost eighty undo steps.</para>
+/// </summary>
+public sealed class ResizeAnnotation(
+    Annotation annotation,
+    GeometryState beforeGeometry, Matrix beforeTransform,
+    GeometryState afterGeometry, Matrix afterTransform) : ISceneCommand
+{
+    public Annotation Annotation => annotation;
+    public GeometryState AfterGeometry { get; private set; } = afterGeometry;
+    public Matrix AfterTransform { get; private set; } = afterTransform;
+
+    public void Do(SceneDocument document)
+    {
+        annotation.RestoreGeometry(AfterGeometry);
+        annotation.Transform = AfterTransform;
+    }
+
+    public void Undo(SceneDocument document)
+    {
+        annotation.RestoreGeometry(beforeGeometry);
+        annotation.Transform = beforeTransform;
+    }
+
+    public bool TryAbsorb(ISceneCommand newer)
+    {
+        if (newer is not ResizeAnnotation resize || !ReferenceEquals(resize.Annotation, annotation)) return false;
+        AfterGeometry = resize.AfterGeometry;
+        AfterTransform = resize.AfterTransform;
+        return true;
+    }
+}
+
 /// <summary>Changes an object's appearance. Absorbs, so dragging a slider is one undo step.</summary>
 public sealed class RestyleAnnotation(Annotation annotation, AnnotationStyle before, AnnotationStyle after)
     : ISceneCommand
