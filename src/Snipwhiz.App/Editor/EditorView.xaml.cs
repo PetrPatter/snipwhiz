@@ -110,6 +110,22 @@ public partial class EditorView : UserControl
     /// <summary>Takes keyboard focus, so shortcuts reach the canvas rather than the grid.</summary>
     public void FocusCanvas() => Canvas.Focus();
 
+    /// <summary>
+    /// Lets go of the capture without saving, because it is being deleted.
+    ///
+    /// <para>Saving here would write a project and a render for a row that no longer
+    /// exists. Nothing is lost by not saving: reaching Delete means going to the
+    /// Library screen, and leaving the editor already saved.</para>
+    /// </summary>
+    public void Discard()
+    {
+        _record = null;
+        _source = null;
+        _document = new SceneDocument { CaptureId = Guid.Empty };
+        _undo = new UndoStack(_document);
+        Canvas.ClearSelection();
+    }
+
     private SceneDocument LoadProject(CaptureRecord record)
     {
         var path = _store.Assets.Project(record.Id);

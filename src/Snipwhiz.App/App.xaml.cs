@@ -196,6 +196,14 @@ public partial class App : Application
     /// window would be captured sitting on top of whatever the user actually
     /// wanted. Hide it first — and always put it back, including on every abort
     /// path, or a cancelled capture silently loses the user's window.
+    ///
+    /// <para><b>This covers the editor too, without knowing about it.</b> Spec §4.17
+    /// called for generalising hide-for-capture to every app window, because an open
+    /// editor would otherwise land in the grab — worst with <i>Open editor after
+    /// capture</i> on, where each capture would photograph the editor the previous
+    /// one opened. Making the editor a screen inside this window rather than a
+    /// window of its own (§4.16) removed the problem instead of solving it: there
+    /// is only one window to hide.</para>
     /// </summary>
     private void HideLibraryForCapture()
     {

@@ -225,6 +225,15 @@ public partial class LibraryWindow : Window
     /// </summary>
     private void Delete(CaptureRecord record)
     {
+        // Trivially reachable: open a capture, go back to Library, delete it. The
+        // editor must let go without saving, or the save writes a project and a
+        // render for a row that no longer exists.
+        if (_editor?.Record?.Id == record.Id)
+        {
+            _editor.Discard();
+            SetScreen(editing: false);
+        }
+
         _store.Delete(record.Id);
         _model.Remove(record.Id);
 
@@ -245,10 +254,16 @@ public partial class LibraryWindow : Window
         entry.Timer.Stop();
         _pendingDeletes.Remove(entry);
 
-        var path = _store.ResolvePath(entry.Record);
-        DropFileReferenceFromClipboard(path);
-        TryDeleteFile(path);
-        _thumbnails.Remove(entry.Record.Id);
+        // Every file the capture owns, not just its PNG. An edited capture also has
+        // a project and a flattened render, and resolving them from the id rather
+        // than the row's columns catches one orphaned by a save that crashed
+        // between writing and recording it.
+        var files = _store.Assets.All(entry.Record);
+
+        // Any of them could be on the clipboard: the original if the tile was
+        // copied, the render if an edited capture was.
+        foreach (var file in files) DropFileReferenceFromClipboard(file);
+        foreach (var file in files) TryDeleteFile(file);
 
         ShowUndoToast();
     }
