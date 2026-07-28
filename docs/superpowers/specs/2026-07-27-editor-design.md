@@ -474,27 +474,36 @@ annotations**, so the round-trip is asserted in a test.
 the exact regression spec 2a's check 11 caught, reintroduced through a new path. It
 matches against `CaptureAssets.All` instead.
 
-### 4.16 The library becomes a pull-up sheet — and there is only ever one of it
+### 4.16 One window, two screens
 
-Spec 2a shipped `LibraryWindow` standalone and committed to re-hosting it here. The
-grid, tiles and preview move into a `LibraryView` control that both the standalone
-window and the editor's bottom sheet host.
+**Superseded during phase A.** This section originally specified the library
+re-hosted as a **pull-up sheet inside a separate editor window**, inherited from
+spec 2a §2 and the original design direction. It is replaced by a **top-level
+Library / Edit switch in a single window**, proposed by the user after driving the
+first runnable editor.
 
-**One `LibraryViewModel` instance, owned by App, shared by both hosts.** Two view
-models over one store would diverge the moment either deleted something, and
-deleting the capture currently open in the editor — trivially reachable from the
-editor's own sheet — is undefined with two. With one, delete of the open document
-closes the editor after its autosave.
+The sheet existed so that the library would not need a window of its own. A view
+switch achieves that more cheaply and deletes the second window entirely: one
+taskbar entry, one Mica surface, one Escape chain, one lifetime. Every hazard the
+review flagged against the sheet disappears rather than being solved —
 
-The re-host is a medium task, not a contained one, and §8 schedules it accordingly.
-`LibraryWindow`'s code-behind also owns behaviour that has to find a new home:
+- Esc routing has one chain instead of two
+- Mica applies to the window, not to a collapsed sheet
+- `FlushPendingDeletes` keeps its existing hide trigger, because the window still hides
+- the **static** `CaptureTile.RemoveRequested` event keeps its single subscriber
 
-- Esc routing and the wheel-scroll override
-- Mica application in `SourceInitialized` — a sheet has no window to apply it to
-- `FlushPendingDeletes` triggered by *hide* (`LibraryWindow.xaml.cs:390`) — "hide"
-  for a collapsed sheet has to be defined, or pending deletes never commit
-- the **static** `CaptureTile.RemoveRequested` event with unsubscribe on `Closed`
-  (`LibraryWindow.xaml.cs:63`) — a second subscriber double-fires every remove
+— and the spring-eased drag gesture is not written at all.
+
+**The editor is a `UserControl`, not a window.** The shell holds both screens and
+asks the editor first on every key: `EditorView.HandleKey` returns false for keys it
+does not want. One place decides who owns the keyboard, so a shortcut cannot mean
+two things at once.
+
+There is one library view model, as before, because there is now only one library.
+
+**Cost of taking it during phase A rather than phase F:** none worth recording. The
+editor was one task old, and every later phase would have been built against the
+two-window assumption.
 
 ### 4.17 Clipboard, export, and hiding for capture
 
@@ -644,7 +653,7 @@ Full parity is the commitment; this is the order it lands in.
 | **C — Redaction and emphasis** | Blur, pixelate, spotlight, magnify, step numbers, callout | Yes |
 | **D — Remaining tools** | Pen, polygon, stamps, cut-out, resize, border, edge effects | Yes |
 | **E — Full style system** | Complete contextual toolbar, per-tool defaults, shadow presets, fills, arrowhead shapes | Yes |
-| **F — Re-host** | Library as a pull-up sheet, shared view model, capture-to-editor setting | Yes |
+| **F — Shell polish** | Screen-switch transitions, capture-to-editor setting. **The re-host itself landed in phase A** (§4.16), so this is what is left of it | Yes |
 
 **Rectangle is Phase A's proving tool** (review S2): it exercises create-by-drag,
 hit-test, select, resize from eight handles, rotate, undo, serialize, flatten and

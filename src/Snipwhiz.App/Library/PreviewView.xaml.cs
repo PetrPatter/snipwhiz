@@ -23,6 +23,7 @@ public partial class PreviewView : System.Windows.Controls.UserControl
     public event Action? Dismissed;
     public event Action<CaptureRecord>? CopyRequested;
     public event Action<CaptureRecord>? DeleteRequested;
+    public event Action<CaptureRecord>? EditRequested;
 
     public PreviewView() : this(null!) { }   // designer only
 
@@ -33,6 +34,14 @@ public partial class PreviewView : System.Windows.Controls.UserControl
 
         BackButton.Click += (_, _) => Close();
         CopyButton.Click += (_, _) => Copy();
+        EditButton.Click += (_, _) =>
+        {
+            var record = _record;
+            if (record is null) return;
+            Close();
+            EditRequested?.Invoke(record);
+        };
+
         DeleteButton.Click += (_, _) =>
         {
             // Captured before Close clears it — the handler runs after.

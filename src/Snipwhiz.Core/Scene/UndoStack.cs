@@ -16,6 +16,17 @@ public sealed class UndoStack(SceneDocument document, int depth = 50)
     private readonly List<ISceneCommand> _done = [];
     private readonly List<ISceneCommand> _undone = [];
 
+    /// <summary>
+    /// The entry the current gesture is still filling in, or null between gestures.
+    ///
+    /// <para>Absorbing has to be bounded by the gesture, not by the object. Without
+    /// this, an <c>AddAnnotation</c> swallows every later change to the shape it
+    /// created — so rotating a rectangle and pressing Ctrl+Z deletes the rectangle
+    /// instead of unrotating it — and a second drag of the same object folds into
+    /// the first, making one Ctrl+Z undo both.</para>
+    /// </summary>
+    private ISceneCommand? _open;
+
     public bool CanUndo => _done.Count > 0;
 
     public bool CanRedo => _undone.Count > 0;
@@ -28,6 +39,15 @@ public sealed class UndoStack(SceneDocument document, int depth = 50)
     /// <para>If the entry on top can absorb it — the same object being dragged, the
     /// same slider being moved — the change still applies but no new entry appears.</para>
     /// </summary>
+    /// <summary>
+    /// Starts a new user action. Everything applied until the next call may fold
+    /// into one undo step; nothing older can.
+    ///
+    /// <para>Called when a gesture starts — a press, a delete, a duplicate. Not
+    /// called between arrow-key nudges, so holding an arrow stays one step.</para>
+    /// </summary>
+    public void BeginGesture() => _open = null;
+
     public void Apply(ISceneCommand command)
     {
         command.Do(document);
@@ -36,15 +56,19 @@ public sealed class UndoStack(SceneDocument document, int depth = 50)
         // Ctrl+Y replay an edit against a scene that has since diverged.
         _undone.Clear();
 
-        if (_done.Count > 0 && _done[^1].TryAbsorb(command)) return;
+        if (_open is not null && _open.TryAbsorb(command)) return;
 
         _done.Add(command);
         if (_done.Count > depth) _done.RemoveAt(0);
+        _open = command;
     }
 
     public void Undo()
     {
         if (!CanUndo) return;
+        // Whatever gesture was open is over; the next change must not fold into a
+        // command that has just been taken back.
+        _open = null;
         var command = _done[^1];
         _done.RemoveAt(_done.Count - 1);
         command.Undo(document);
@@ -54,6 +78,7 @@ public sealed class UndoStack(SceneDocument document, int depth = 50)
     public void Redo()
     {
         if (!CanRedo) return;
+        _open = null;
         var command = _undone[^1];
         _undone.RemoveAt(_undone.Count - 1);
         command.Do(document);
@@ -64,5 +89,6 @@ public sealed class UndoStack(SceneDocument document, int depth = 50)
     {
         _done.Clear();
         _undone.Clear();
+        _open = null;
     }
 }

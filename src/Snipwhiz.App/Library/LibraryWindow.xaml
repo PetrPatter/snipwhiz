@@ -58,7 +58,36 @@
       the surface reliably dark while still letting the backdrop read through it.
     -->
     <Grid Background="#B21C1B1A">
-    <Grid x:Name="RootContent" Margin="28,20,28,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!--
+          One window, two screens. This replaces spec §4.15's pull-up sheet: the
+          sheet existed so the library would not need a window of its own, and a
+          view switch achieves that with one Mica surface, one Escape chain and
+          one lifetime instead of two.
+        -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="28,18,28,0">
+            <Button x:Name="LibraryTab" Content="Library"
+                    Background="Transparent" BorderThickness="0"
+                    Foreground="{StaticResource Ink}"
+                    FontSize="22" FontWeight="SemiBold"
+                    Padding="0,0,0,6" Cursor="Hand"/>
+            <Border x:Name="LibraryTabMark" Width="46" Height="2" Background="{StaticResource Accent}"
+                    VerticalAlignment="Bottom" Margin="-46,0,0,0"/>
+
+            <Button x:Name="EditTab" Content="Edit"
+                    Background="Transparent" BorderThickness="0"
+                    Foreground="{StaticResource InkMuted}"
+                    FontSize="22" FontWeight="SemiBold"
+                    Padding="0,0,0,6" Margin="26,0,0,0" Cursor="Hand"/>
+            <Border x:Name="EditTabMark" Width="30" Height="2" Background="{StaticResource Accent}"
+                    VerticalAlignment="Bottom" Margin="-30,0,0,0" Visibility="Collapsed"/>
+        </StackPanel>
+
+    <Grid x:Name="RootContent" Grid.Row="1" Margin="28,14,28,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -66,17 +95,11 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
+        <Grid Grid.Row="0" Margin="0,0,0,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-
-            <TextBlock Grid.Column="0"
-                       Text="Library"
-                       Foreground="{StaticResource Ink}"
-                       FontSize="26" FontWeight="SemiBold"
-                       VerticalAlignment="Center"/>
 
             <Border Grid.Column="1"
                     Background="{StaticResource SurfaceRaised}"
@@ -137,10 +160,14 @@
     </Grid>
 
         <!-- Preview sits above the grid in the same window (spec 2a §4.11). -->
-        <ContentControl x:Name="PreviewHost" Margin="20,12,20,12"/>
+        <ContentControl x:Name="PreviewHost" Grid.Row="1" Margin="20,12,20,12"/>
+
+        <!-- The Edit screen. Same row, shown instead of the library. -->
+        <ContentControl x:Name="EditorHost" Grid.Row="1"
+                        Margin="28,14,28,16" Visibility="Collapsed"/>
 
         <!-- Undo toast: an affordance instead of a confirmation dialog. -->
-        <Border x:Name="UndoToast"
+        <Border x:Name="UndoToast" Grid.Row="1"
                 Visibility="Collapsed"
                 HorizontalAlignment="Center" VerticalAlignment="Bottom"
                 Margin="0,0,0,28"

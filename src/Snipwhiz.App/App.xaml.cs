@@ -1,4 +1,6 @@
+using System.IO;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
@@ -142,8 +144,38 @@ public partial class App : Application
     private void ShowLibrary()
     {
         _thumbnails ??= new ThumbnailCache(_store!);
-        _library ??= new LibraryWindow(_store!, _thumbnails);
+        if (_library is null)
+        {
+            _library = new LibraryWindow(_store!, _thumbnails);
+            _library.EditRequested += ShowEditor;
+        }
         _library.Reveal();
+    }
+
+    /// <summary>
+    /// Opens a capture in the editor, decoding the <b>original</b> rather than the
+    /// display image: the editor edits the capture, and the flattened render is an
+    /// output of that, not an input to it.
+    /// </summary>
+    private void ShowEditor(CaptureRecord record)
+    {
+        BitmapSource source;
+        try
+        {
+            using var stream = File.OpenRead(_store!.Assets.Original(record));
+            var frame = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            frame.Freeze();
+            source = frame;
+        }
+        catch (Exception e) when (e is IOException or NotSupportedException or ArgumentException)
+        {
+            // Spec §4.18: opening an editor over a blank canvas and letting someone
+            // annotate nothing is worse than refusing.
+            _tray?.ShowBalloon("Can't edit this capture", "The image file is missing or unreadable.", isError: true);
+            return;
+        }
+
+        _library?.ShowEditor(record, source);
     }
 
     private bool _libraryHiddenForCapture;

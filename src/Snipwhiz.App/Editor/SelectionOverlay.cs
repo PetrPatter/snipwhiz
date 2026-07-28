@@ -28,10 +28,10 @@ internal static class SelectionOverlay
 
     private static readonly Brush HandleFill = Frozen(Color.FromRgb(0xFA, 0xFA, 0xFA));
     private static readonly Pen HandleEdge = Frozen(new Pen(Frozen(Color.FromRgb(0x1C, 0x1B, 0x1A)), 1));
-    private static readonly Pen Outline = Frozen(new Pen(Frozen(Color.FromRgb(0xE5, 0x48, 0x4D)), 1.25));
-    private static readonly Pen RotateArm = Frozen(new Pen(Frozen(Color.FromRgb(0xE5, 0x48, 0x4D)), 1));
-    private static readonly Pen MarqueeEdge = Frozen(new Pen(Frozen(Color.FromRgb(0xE5, 0x48, 0x4D)), 1));
-    private static readonly Brush MarqueeFill = Frozen(Color.FromArgb(0x22, 0xE5, 0x48, 0x4D));
+    private static readonly Pen Outline = Frozen(new Pen(Frozen(Color.FromRgb(0xE8, 0x83, 0x3A)), 1.25));
+    private static readonly Pen RotateArm = Frozen(new Pen(Frozen(Color.FromRgb(0xE8, 0x83, 0x3A)), 1));
+    private static readonly Pen MarqueeEdge = Frozen(new Pen(Frozen(Color.FromRgb(0xE8, 0x83, 0x3A)), 1));
+    private static readonly Brush MarqueeFill = Frozen(Color.FromArgb(0x22, 0xE8, 0x83, 0x3A));
 
     public static void Render(
         DrawingContext dc, CanvasHost canvas, IReadOnlyList<Annotation> selection, Rect? marquee)

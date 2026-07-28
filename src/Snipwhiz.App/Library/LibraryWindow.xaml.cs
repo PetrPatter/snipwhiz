@@ -7,9 +7,11 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Snipwhiz.Core.Clipboard;
 using Snipwhiz.Core.Imaging;
+using Snipwhiz.Core.Scene;
 using Snipwhiz.Core.Storage;
 
 namespace Snipwhiz.App.Library;
@@ -41,7 +43,12 @@ public partial class LibraryWindow : Window
         _preview = new PreviewView(store);
         _preview.Dismissed += () => RootContent.Visibility = Visibility.Visible;
         _preview.DeleteRequested += Delete;
+        _preview.EditRequested += record => EditRequested?.Invoke(record);
         PreviewHost.Content = _preview;
+
+        LibraryTab.Click += (_, _) => ShowLibraryScreen();
+        EditTab.Click += (_, _) => { if (_editor?.Record is not null) SetScreen(editing: true); };
+        EditTab.IsEnabled = false;
 
         UndoButton.Click += (_, _) => UndoLastDelete();
 
@@ -119,6 +126,62 @@ public partial class LibraryWindow : Window
     /// A capture taken while this window is open, inserted without a re-query —
     /// the record is already in hand.
     /// </summary>
+    /// <summary>The user asked to edit a capture. App decodes it and calls <see cref="ShowEditor"/>.</summary>
+    public event Action<CaptureRecord>? EditRequested;
+
+    private Editor.EditorView? _editor;
+
+    /// <summary>
+    /// Switches to the Edit screen, creating it on first use.
+    ///
+    /// <para>The editor is a view in this window rather than a window of its own:
+    /// one taskbar entry, one Mica surface, one Escape chain, one lifetime.</para>
+    /// </summary>
+    public void ShowEditor(CaptureRecord record, BitmapSource source)
+    {
+        if (_editor is null)
+        {
+            _editor = new Editor.EditorView(_store);
+            _editor.ExitRequested += ShowLibraryScreen;
+            _editor.SaveRequested += (r, d) => EditorSaveRequested?.Invoke(r, d);
+            EditorHost.Content = _editor;
+        }
+
+        _editor.Open(record, source);
+        SetScreen(editing: true);
+        _editor.FocusCanvas();
+    }
+
+    /// <summary>Forwarded from the editor so App can own the save pipeline (task 11).</summary>
+    public event Action<CaptureRecord, SceneDocument>? EditorSaveRequested;
+
+    private void ShowLibraryScreen()
+    {
+        // Leaving the editor saves. There is no unsaved state to ask about.
+        _editor?.Save();
+        SetScreen(editing: false);
+    }
+
+    private void SetScreen(bool editing)
+    {
+        RootContent.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+        EditorHost.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+
+        EditTab.IsEnabled = _editor?.Record is not null;
+        EditTabMark.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
+        LibraryTabMark.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
+        EditTab.Foreground = editing ? Ink : InkMuted;
+        LibraryTab.Foreground = editing ? InkMuted : Ink;
+
+        if (!editing) _preview.Close();
+    }
+
+    private bool IsEditing => EditorHost.Visibility == Visibility.Visible;
+
+    private Brush Ink => (Brush)FindResource("Ink");
+
+    private Brush InkMuted => (Brush)FindResource("InkMuted");
+
     public void OnCaptureCompleted(CaptureRecord record)
     {
         // Deliberately not gated on IsVisible: the window is hidden at this moment
@@ -355,6 +418,16 @@ public partial class LibraryWindow : Window
 
     protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
     {
+        // The editor owns the keyboard while it is on screen, and says so by
+        // returning false for keys it does not want. One place decides, so a
+        // shortcut can never mean two things at once.
+        if (IsEditing && _editor is not null)
+        {
+            if (_editor.HandleKey(e)) { e.Handled = true; return; }
+            base.OnKeyDown(e);
+            return;
+        }
+
         if (e.Key == Key.Escape)
         {
             // Esc backs out one level: preview first, then the window.

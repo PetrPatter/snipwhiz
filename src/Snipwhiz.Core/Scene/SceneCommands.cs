@@ -39,6 +39,24 @@ public sealed class AddAnnotation(Annotation annotation) : ISceneCommand
     public void Do(SceneDocument document) => document.Annotations.Add(annotation);
 
     public void Undo(SceneDocument document) => document.Annotations.Remove(annotation);
+
+    /// <summary>
+    /// Swallows the reshaping that happens while the object is being drawn.
+    ///
+    /// <para>A shape created by dragging is added on press and resized on every
+    /// move. Without this, drawing one rectangle costs two undo steps and the first
+    /// press of Ctrl+Z leaves a tiny one behind instead of removing it.</para>
+    ///
+    /// <para>Safe because <see cref="Undo"/> removes the object whatever shape it
+    /// ended up, and redo re-adds it with the shape it was left at.</para>
+    /// </summary>
+    public bool TryAbsorb(ISceneCommand newer) => newer switch
+    {
+        ResizeAnnotation resize => ReferenceEquals(resize.Annotation, annotation),
+        MoveAnnotation move => ReferenceEquals(move.Annotation, annotation),
+        ReshapeAnnotation reshape => ReferenceEquals(reshape.Annotation, annotation),
+        _ => false,
+    };
 }
 
 /// <summary>

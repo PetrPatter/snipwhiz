@@ -32,6 +32,10 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
 
     public void OnPress(Point image, ModifierKeys modifiers)
     {
+        // A new gesture. Without this the drag folds into whatever the last one
+        // was — including the command that created the shape.
+        undo.BeginGesture();
+
         var element = canvas.ToElement(image);
 
         // A handle belongs to the selected object and is checked first: handles sit

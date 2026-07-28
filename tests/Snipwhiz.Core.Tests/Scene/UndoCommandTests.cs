@@ -242,6 +242,84 @@ public class UndoCommandTests : IDisposable
         Assert.Equal(start, annotation.Transform);
     }
 
+    /// <summary>
+    /// Absorbing is bounded by the gesture, not by the object.
+    ///
+    /// <para>Reported from use: drawing a rectangle and then rotating it, then
+    /// pressing Ctrl+Z, deleted the rectangle instead of unrotating it. The add
+    /// command was swallowing every later change to the shape it created, forever.</para>
+    /// </summary>
+    [Fact]
+    public void Changing_an_object_after_it_was_drawn_is_its_own_undo_step()
+    {
+        var document = Empty();
+        var stack = new UndoStack(document);
+        var annotation = Rect();
+
+        // The drawing gesture: added, then resized as the pointer moves.
+        stack.BeginGesture();
+        stack.Apply(new AddAnnotation(annotation));
+        stack.Apply(new ResizeAnnotation(annotation, annotation.CaptureGeometry(), annotation.Transform,
+            new RectangleGeometryState(new Size(160, 90)), annotation.Transform));
+        Assert.Equal(1, stack.Depth);
+
+        // A separate gesture: rotate it.
+        var turned = Matrix.Identity;
+        turned.Rotate(30);
+        stack.BeginGesture();
+        stack.Apply(new MoveAnnotation(annotation, annotation.Transform, turned));
+        Assert.Equal(2, stack.Depth);
+
+        // One Ctrl+Z unrotates and leaves the rectangle alone.
+        stack.Undo();
+        Assert.Single(document.Annotations);
+        Assert.Equal(new Size(160, 90), ((RectangleAnnotation)document.Annotations[0]).Size);
+
+        // A second takes the rectangle away.
+        stack.Undo();
+        Assert.Empty(document.Annotations);
+    }
+
+    [Fact]
+    public void Two_separate_drags_of_the_same_object_are_two_undo_steps()
+    {
+        var document = Empty();
+        var annotation = Rect();
+        document.Annotations.Add(annotation);
+        var start = annotation.Transform;
+        var stack = new UndoStack(document);
+
+        stack.BeginGesture();
+        stack.Apply(new MoveAnnotation(annotation, start, new Matrix(1, 0, 0, 1, 50, 0)));
+
+        stack.BeginGesture();
+        stack.Apply(new MoveAnnotation(annotation, annotation.Transform, new Matrix(1, 0, 0, 1, 90, 0)));
+
+        Assert.Equal(2, stack.Depth);
+
+        stack.Undo();
+        Assert.Equal(50, annotation.Transform.OffsetX);
+    }
+
+    [Fact]
+    public void A_change_after_an_undo_does_not_fold_into_the_command_that_was_taken_back()
+    {
+        var document = Empty();
+        var annotation = Rect();
+        document.Annotations.Add(annotation);
+        var stack = new UndoStack(document);
+
+        stack.BeginGesture();
+        stack.Apply(new MoveAnnotation(annotation, annotation.Transform, new Matrix(1, 0, 0, 1, 50, 0)));
+        stack.Undo();
+
+        stack.Apply(new MoveAnnotation(annotation, annotation.Transform, new Matrix(1, 0, 0, 1, 70, 0)));
+
+        Assert.Equal(1, stack.Depth);
+        stack.Undo();
+        Assert.Equal(0, annotation.Transform.OffsetX);
+    }
+
     [Fact]
     public void Dragging_a_different_object_starts_a_new_undo_step()
     {

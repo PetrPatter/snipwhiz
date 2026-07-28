@@ -38,6 +38,13 @@
                         Foreground="#8F8A80" FontSize="13"
                         Padding="14,7" Margin="0,0,8,0" Cursor="Hand"/>
 
+                <Button x:Name="EditButton"
+                        Content="Edit"
+                        Background="Transparent" BorderThickness="1"
+                        BorderBrush="#3A3630"
+                        Foreground="#F5F2EC" FontSize="13"
+                        Padding="16,6" Margin="0,0,8,0" Cursor="Hand"/>
+
                 <Button x:Name="CopyButton"
                         Content="Copy"
                         Background="#E8833A" BorderThickness="0"
