@@ -19,6 +19,7 @@ public sealed class CaptureStore : IDisposable
     {
         _root = root;
         _newId = newId ?? Guid.CreateVersion7;
+        Assets = new CaptureAssets(root);
         Directory.CreateDirectory(_root);
         _db = new LibraryDb(Path.Combine(_root, "library.db"));
     }
@@ -28,11 +29,21 @@ public sealed class CaptureStore : IDisposable
     public string Root => _root;
 
     /// <summary>
-    /// <see cref="CaptureRecord.FilePath"/> is relative to the store root so the
-    /// folder stays movable, which means nothing outside this class can open a
-    /// capture without this.
+    /// Path resolution for every file a capture owns. Anything deciding what to
+    /// <i>show</i> goes through <see cref="CaptureAssets.Display"/>, not
+    /// <see cref="ResolvePath"/>.
     /// </summary>
-    public string ResolvePath(CaptureRecord record) => Path.Combine(_root, record.FilePath);
+    public CaptureAssets Assets { get; }
+
+    /// <summary>
+    /// The immutable original. <see cref="CaptureRecord.FilePath"/> is relative to
+    /// the store root so the folder stays movable.
+    ///
+    /// <para>Kept for the editor, which genuinely wants the unannotated capture as
+    /// its source bitmap. If you are choosing an image to display, copy or export,
+    /// this is the wrong method — see <see cref="Assets"/>.</para>
+    /// </summary>
+    public string ResolvePath(CaptureRecord record) => Assets.Original(record);
 
     public static string DefaultRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Snipwhiz");
@@ -83,6 +94,12 @@ public sealed class CaptureStore : IDisposable
     public bool Delete(Guid id) => _db.Delete(id);
 
     public void Insert(CaptureRecord record) => _db.Insert(record);
+
+    /// <summary>Records the result of an editor save. Spec 2b §4.12.</summary>
+    public void SetEditPaths(
+        Guid id, string projectPath, string? flatPath,
+        int? flatWidth, int? flatHeight, DateTimeOffset editedUtc) =>
+        _db.SetEditPaths(id, projectPath, flatPath, flatWidth, flatHeight, editedUtc);
 
     public int Count() => _db.Count();
 

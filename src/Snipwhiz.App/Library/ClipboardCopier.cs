@@ -24,7 +24,11 @@ internal static class ClipboardCopier
 {
     public static Task<CopyResult> CopyAsync(CaptureStore store, CaptureRecord record)
     {
-        var path = store.ResolvePath(record);
+        // Display, not the original. Copying an edited capture must put the
+        // annotated image on the clipboard — including as the CF_HDROP file
+        // reference, so a paste into a terminal or a file picker gets the same
+        // picture the grid showed.
+        var path = store.Assets.Display(record);
 
         // Never on the UI thread: this decodes a full PNG, re-encodes it to PNG
         // inside the writer, and can spend up to eight 60 ms sleeps waiting for a

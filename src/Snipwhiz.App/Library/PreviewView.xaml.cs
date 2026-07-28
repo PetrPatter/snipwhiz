@@ -71,7 +71,9 @@ public partial class PreviewView : System.Windows.Controls.UserControl
         var cts = new CancellationTokenSource();
         _pending = cts;
 
-        var path = _store.ResolvePath(record);
+        // Display, not the original: the preview is what the user opened the tile
+        // to look at, so it shows the annotations if there are any.
+        var path = _store.Assets.Display(record);
         try
         {
             // The full PNG, not the thumbnail scaled up: a lossy 320px preview

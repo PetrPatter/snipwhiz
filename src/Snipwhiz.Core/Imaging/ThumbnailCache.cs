@@ -33,9 +33,7 @@ public sealed class ThumbnailCache(CaptureStore store) : IDisposable
     // keeps a fast scroll through a large library from starving the UI thread.
     private readonly SemaphoreSlim _slots = new(Math.Max(1, Environment.ProcessorCount / 2));
 
-    private string ThumbsDir => Path.Combine(store.Root, "thumbs");
-
-    public string PathFor(Guid id) => Path.Combine(ThumbsDir, $"{id:D}.jpg");
+    public string PathFor(Guid id) => store.Assets.Thumbnail(id);
 
     /// <returns>Absolute path of the cached JPEG.</returns>
     /// <exception cref="ImageDecodeException">The original is missing or unreadable.</exception>
@@ -52,7 +50,9 @@ public sealed class ThumbnailCache(CaptureStore store) : IDisposable
             if (IsUsable(thumbPath)) return thumbPath;
 
             ct.ThrowIfCancellationRequested();
-            var source = store.ResolvePath(record);
+            // Display, not the original: once a capture has been edited the grid
+            // must show the annotations, and this is the only place that decides it.
+            var source = store.Assets.Display(record);
             await Task.Run(() => Generate(source, thumbPath, ct), ct).ConfigureAwait(false);
             return thumbPath;
         }
