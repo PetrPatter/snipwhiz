@@ -50,4 +50,21 @@
     <AdditionalFiles Include="NativeMethods.txt" />
   </ItemGroup>
 
+  <!--
+    Same reason as Snipwhiz.Core: System.Drawing arrives implicitly with
+    UseWindowsForms and shadows Point, Size, Color, Brush and Pen — the WPF types
+    the editor is built from. Removed from the implicit set so WPF wins by
+    default; the tray, which is the only WinForms surface here, imports it
+    explicitly.
+  -->
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <!--
+      And System.Windows.Forms, which shadows the WPF input types: MouseEventArgs,
+      MouseButtonEventArgs and KeyEventArgs all exist in both. Only TrayHost is
+      WinForms, and it says so.
+    -->
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
 </Project>

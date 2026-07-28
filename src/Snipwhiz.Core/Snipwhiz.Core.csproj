@@ -10,7 +10,35 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseWindowsForms>true</UseWindowsForms>
+    <!--
+      Spec 2b §1 supersedes spec 1 §3, which recorded twice that Core has no WPF
+      reference. Annotation.Render(DrawingContext) lives here so the on-screen
+      canvas and the flattener are the same code — the only thing that makes
+      WYSIWYG a property rather than a hope. WinForms stays for NotifyIcon.
+    -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
+
+  <!--
+    UseWPF drops System.IO from the implicit usings, because System.Windows.Shapes.Path
+    collides with System.IO.Path. Shapes is not in this project's merged WinForms+WPF
+    implicit set, so nothing here actually collides and the SDK default is restored
+    rather than adding `using System.IO;` to every file that touches a path.
+    If a future file does pull in System.Windows.Shapes, `Path` becomes ambiguous —
+    that surfaces as a compile error, not a silent change.
+  -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <!--
+      System.Drawing arrives implicitly with UseWindowsForms and shadows the WPF
+      types the annotation model is built from: Point, Size, Color, Brush and Pen
+      all exist in both. Removed from the implicit set so WPF wins by default, and
+      imported explicitly by the four files that genuinely want GDI+ — all of them
+      imaging code that predates the editor. The alternative was aliasing five WPF
+      types in every one of the ~15 annotation classes still to come.
+    -->
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />

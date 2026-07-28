@@ -19,6 +19,19 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!--
+    Committed .ssproj files that must keep loading. A format change that breaks
+    them is a format change that breaks every project a user has saved.
+
+    Include, not Update: MSBuild's DefaultItemExcludes contains **/*.*proj, and
+    our extension ends in "proj", so these are excluded from the default None
+    items and there is nothing for Update to modify. It fails as files silently
+    missing from the output directory rather than as a build error.
+  -->
+  <ItemGroup>
+    <None Include="Fixtures\*.ssproj" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Snipwhiz.Core\Snipwhiz.Core.csproj" />
   </ItemGroup>

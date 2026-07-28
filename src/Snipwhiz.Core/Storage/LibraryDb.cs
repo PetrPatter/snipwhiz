@@ -4,7 +4,7 @@ namespace Snipwhiz.Core.Storage;
 
 public sealed class LibraryDb : IDisposable
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
     private readonly SqliteConnection _connection;
 
     public LibraryDb(string dbPath)
@@ -77,6 +77,25 @@ public sealed class LibraryDb : IDisposable
             cmd.ExecuteNonQuery();
         }
 
+        if (version < 3)
+        {
+            // The editor's columns. All nullable: every capture taken before spec
+            // 2b has no project and no render, and most never will.
+            //
+            // flat_width/flat_height are stored rather than derived because a
+            // border or edge effect makes the render larger than the capture, and
+            // reading a PNG header per tile to find that out is work on the UI
+            // thread for something the row can carry.
+            cmd.CommandText = """
+                ALTER TABLE captures ADD COLUMN project_path TEXT;
+                ALTER TABLE captures ADD COLUMN flat_path    TEXT;
+                ALTER TABLE captures ADD COLUMN flat_width   INTEGER;
+                ALTER TABLE captures ADD COLUMN flat_height  INTEGER;
+                ALTER TABLE captures ADD COLUMN edited_utc   INTEGER;
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
         // PRAGMA takes a literal, not a parameter. CurrentSchemaVersion is a
         // compile-time constant, so there is no injection surface here.
         cmd.CommandText = $"PRAGMA user_version = {CurrentSchemaVersion};";
@@ -85,12 +104,19 @@ public sealed class LibraryDb : IDisposable
         tx.Commit();
     }
 
+    /// <summary>
+    /// Writes every column, including the editor's. Undo-of-delete re-inserts a
+    /// record that came back out of this table, so a column dropped here silently
+    /// severs a capture from its annotations — recoverable only by hand.
+    /// </summary>
     public void Insert(CaptureRecord r)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO captures (id, created_utc, width, height, source_app, source_title, file_path)
-            VALUES ($id, $created, $w, $h, $app, $title, $path);
+            INSERT INTO captures (id, created_utc, width, height, source_app, source_title, file_path,
+                                  project_path, flat_path, flat_width, flat_height, edited_utc)
+            VALUES ($id, $created, $w, $h, $app, $title, $path,
+                    $project, $flat, $fw, $fh, $edited);
             """;
         cmd.Parameters.AddWithValue("$id", r.Id.ToString("D"));
         cmd.Parameters.AddWithValue("$created", r.CreatedUtc.ToUnixTimeMilliseconds());
@@ -99,11 +125,45 @@ public sealed class LibraryDb : IDisposable
         cmd.Parameters.AddWithValue("$app", r.SourceApp);
         cmd.Parameters.AddWithValue("$title", r.SourceTitle);
         cmd.Parameters.AddWithValue("$path", r.FilePath);
+        cmd.Parameters.AddWithValue("$project", (object?)r.ProjectPath ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$flat", (object?)r.FlatPath ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$fw", (object?)r.FlatWidth ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$fh", (object?)r.FlatHeight ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$edited",
+            (object?)r.EditedUtc?.ToUnixTimeMilliseconds() ?? DBNull.Value);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Records the result of an editor save. Spec 2b §4.12.</summary>
+    public void SetEditPaths(
+        Guid id, string projectPath, string? flatPath,
+        int? flatWidth, int? flatHeight, DateTimeOffset editedUtc)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+            UPDATE captures
+               SET project_path = $project,
+                   flat_path    = $flat,
+                   flat_width   = $fw,
+                   flat_height  = $fh,
+                   edited_utc   = $edited
+             WHERE id = $id;
+            """;
+        cmd.Parameters.AddWithValue("$id", id.ToString("D"));
+        cmd.Parameters.AddWithValue("$project", projectPath);
+        cmd.Parameters.AddWithValue("$flat", (object?)flatPath ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$fw", (object?)flatWidth ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$fh", (object?)flatHeight ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$edited", editedUtc.ToUnixTimeMilliseconds());
         cmd.ExecuteNonQuery();
     }
 
     private const string SelectColumns =
-        "SELECT id, created_utc, width, height, source_app, source_title, file_path FROM captures";
+        """
+        SELECT id, created_utc, width, height, source_app, source_title, file_path,
+               project_path, flat_path, flat_width, flat_height, edited_utc
+          FROM captures
+        """;
 
     public IReadOnlyList<CaptureRecord> Recent(int limit)
     {
@@ -191,7 +251,14 @@ public sealed class LibraryDb : IDisposable
                 reader.GetInt32(3),
                 reader.GetString(4),
                 reader.GetString(5),
-                reader.GetString(6)));
+                reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.IsDBNull(9) ? null : reader.GetInt32(9),
+                reader.IsDBNull(10) ? null : reader.GetInt32(10),
+                reader.IsDBNull(11)
+                    ? null
+                    : DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(11))));
         }
         return results;
     }

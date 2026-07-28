@@ -1,4 +1,6 @@
+using System.IO;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
@@ -80,6 +82,26 @@ public partial class App : Application
 
             RegisterHotkeys();
 
+            // Stands up its own window and closes it; nothing else in the app is
+            // involved, so it runs before the library gates and returns.
+            if (Diagnostics.CanvasVerification.IsEnabled)
+            {
+                Diagnostics.CanvasVerification.RunIfRequested();
+                return;
+            }
+
+            if (Diagnostics.WysiwygVerification.IsEnabled)
+            {
+                Diagnostics.WysiwygVerification.RunIfRequested();
+                return;
+            }
+
+            if (Diagnostics.EditorMemoryVerification.IsEnabled)
+            {
+                Diagnostics.EditorMemoryVerification.RunIfRequested(_store);
+                return;
+            }
+
             // The grid and resize gates drive the window themselves, so they need
             // it open without waiting for someone to press the hotkey.
             if (Diagnostics.GridVerification.IsEnabled || Diagnostics.ResizeVerification.IsEnabled)
@@ -130,12 +152,55 @@ public partial class App : Application
     private LibraryWindow? _library;
 
     private ThumbnailCache? _thumbnails;
+    private Editor.SavePipeline? _saves;
 
     private void ShowLibrary()
     {
         _thumbnails ??= new ThumbnailCache(_store!);
-        _library ??= new LibraryWindow(_store!, _thumbnails);
+        if (_library is null)
+        {
+            _library = new LibraryWindow(_store!, _thumbnails);
+            _library.EditRequested += ShowEditor;
+
+            _saves = new Editor.SavePipeline(_store!, _thumbnails, Dispatcher);
+            _saves.Saved += saved => _library!.OnEditSaved(saved);
+            _saves.RenderFailed += (_, e) => _tray?.ShowBalloon(
+                "Couldn't render the edited image",
+                "Your annotations are saved. The library will show the original until the next save.",
+                isError: true);
+
+            _library.EditorSaveRequested += (record, document, source) =>
+                _saves!.Save(record, document, source);
+            _library.EditorUrgentSaveRequested += (record, document) =>
+                _saves!.SaveProjectNow(record, document);
+        }
         _library.Reveal();
+    }
+
+    /// <summary>
+    /// Opens a capture in the editor, decoding the <b>original</b> rather than the
+    /// display image: the editor edits the capture, and the flattened render is an
+    /// output of that, not an input to it.
+    /// </summary>
+    private void ShowEditor(CaptureRecord record)
+    {
+        BitmapSource source;
+        try
+        {
+            using var stream = File.OpenRead(_store!.Assets.Original(record));
+            var frame = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            frame.Freeze();
+            source = frame;
+        }
+        catch (Exception e) when (e is IOException or NotSupportedException or ArgumentException)
+        {
+            // Spec §4.18: opening an editor over a blank canvas and letting someone
+            // annotate nothing is worse than refusing.
+            _tray?.ShowBalloon("Can't edit this capture", "The image file is missing or unreadable.", isError: true);
+            return;
+        }
+
+        _library?.ShowEditor(record, source);
     }
 
     private bool _libraryHiddenForCapture;
@@ -145,6 +210,14 @@ public partial class App : Application
     /// window would be captured sitting on top of whatever the user actually
     /// wanted. Hide it first — and always put it back, including on every abort
     /// path, or a cancelled capture silently loses the user's window.
+    ///
+    /// <para><b>This covers the editor too, without knowing about it.</b> Spec §4.17
+    /// called for generalising hide-for-capture to every app window, because an open
+    /// editor would otherwise land in the grab — worst with <i>Open editor after
+    /// capture</i> on, where each capture would photograph the editor the previous
+    /// one opened. Making the editor a screen inside this window rather than a
+    /// window of its own (§4.16) removed the problem instead of solving it: there
+    /// is only one window to hide.</para>
     /// </summary>
     private void HideLibraryForCapture()
     {

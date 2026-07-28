@@ -38,6 +38,44 @@ public sealed class CaptureTileViewModel(CaptureRecord record, ThumbnailCache ca
 
     public CaptureRecord Record => record;
 
+    /// <summary>
+    /// Points this tile at the capture as it now stands, and re-fetches its
+    /// thumbnail.
+    ///
+    /// <para><b>Replacing the record is the part that is easy to miss.</b>
+    /// <c>ThumbnailCache</c> resolves through <c>CaptureAssets.Display</c>, which
+    /// decides between the render and the original by reading
+    /// <c>FlatPath</c> <i>on the record it is handed</i>. Deleting the cached
+    /// JPEG and re-fetching against the stale record regenerates a thumbnail of
+    /// the un-annotated capture — the same visible failure, reached by a longer
+    /// route.</para>
+    /// </summary>
+    public void Refresh(CaptureRecord updated)
+    {
+        record = updated;
+        Raise(nameof(Record));
+        Raise(nameof(Caption));
+        Raise(nameof(Dimensions));
+        Raise(nameof(TakenAt));
+
+        Thumbnail = null;
+        IsMissing = false;
+        _loaded = false;
+
+        // Not bound to anything on screen, so the next bind will fetch it. Fetching
+        // now would decode a bitmap nothing is displaying.
+        if (!IsBound) return;
+        _ = ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        await EnsureThumbnailAsync(CancellationToken.None);
+        // Scrolled away while it decoded. Keeping it would retain a bitmap no tile
+        // is showing, which is the leak the binding count exists to prevent.
+        if (!IsBound) ReleaseThumbnail();
+    }
+
     public string Caption => string.IsNullOrWhiteSpace(record.SourceApp) ? "Capture" : record.SourceApp;
 
     public string Dimensions => $"{record.Width} × {record.Height}";
@@ -97,6 +135,12 @@ public sealed class CaptureTileViewModel(CaptureRecord record, ThumbnailCache ca
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                // WPF keeps a process-wide imaging cache keyed on the URI. A
+                // thumbnail path never changes but its contents do — every time a
+                // capture is edited — so without this a re-decode is served the
+                // bitmap from before the edit and the tile silently stays stale.
+                if (!Diagnostics.RefreshVerification.BreakImageCache)
+                    bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
                 bitmap.UriSource = new Uri(path);
                 bitmap.EndInit();
                 bitmap.Freeze();

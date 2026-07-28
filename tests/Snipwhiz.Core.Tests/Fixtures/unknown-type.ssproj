@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "captureId": "0198f2c1-4a5b-7c6d-8e9f-a0b1c2d3e4f5",
+  "document": {
+    "crop": null
+  },
+  "annotations": [
+    {
+      "type": "rectangle",
+      "id": "0198f2c1-0000-7000-8000-000000000001",
+      "z": 0,
+      "transform": [1, 0, 0, 1, 10, 10],
+      "style": {
+        "stroke": "#E5484D",
+        "width": 4,
+        "fill": null,
+        "opacity": 1
+      },
+      "geometry": {
+        "width": 50,
+        "height": 50
+      }
+    },
+    {
+      "type": "hologram",
+      "id": "0198f2c1-0000-7000-8000-0000000000ff",
+      "z": 1,
+      "transform": [1, 0, 0, 1, 300, 200],
+      "style": {
+        "stroke": "#00FF00",
+        "width": 7,
+        "fill": null,
+        "opacity": 1
+      },
+      "geometry": {
+        "radius": 42,
+        "shimmer": "iridescent",
+        "nested": { "keep": [1, 2, 3] }
+      }
+    }
+  ]
+}

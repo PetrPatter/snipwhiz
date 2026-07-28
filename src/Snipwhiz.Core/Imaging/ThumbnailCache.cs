@@ -33,9 +33,7 @@ public sealed class ThumbnailCache(CaptureStore store) : IDisposable
     // keeps a fast scroll through a large library from starving the UI thread.
     private readonly SemaphoreSlim _slots = new(Math.Max(1, Environment.ProcessorCount / 2));
 
-    private string ThumbsDir => Path.Combine(store.Root, "thumbs");
-
-    public string PathFor(Guid id) => Path.Combine(ThumbsDir, $"{id:D}.jpg");
+    public string PathFor(Guid id) => store.Assets.Thumbnail(id);
 
     /// <returns>Absolute path of the cached JPEG.</returns>
     /// <exception cref="ImageDecodeException">The original is missing or unreadable.</exception>
@@ -52,7 +50,9 @@ public sealed class ThumbnailCache(CaptureStore store) : IDisposable
             if (IsUsable(thumbPath)) return thumbPath;
 
             ct.ThrowIfCancellationRequested();
-            var source = store.ResolvePath(record);
+            // Display, not the original: once a capture has been edited the grid
+            // must show the annotations, and this is the only place that decides it.
+            var source = store.Assets.Display(record);
             await Task.Run(() => Generate(source, thumbPath, ct), ct).ConfigureAwait(false);
             return thumbPath;
         }
@@ -131,12 +131,57 @@ public sealed class ThumbnailCache(CaptureStore store) : IDisposable
                 handle.Free();
             }
 
-            File.Move(tempPath, thumbPath, overwrite: true);
+            Publish(tempPath, thumbPath);
         }
         catch
         {
             try { File.Delete(tempPath); } catch (IOException) { }
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Moves the finished thumbnail into place, tolerating another thread having
+    /// got there first.
+    ///
+    /// The unique temp name above stops two concurrent generators writing the same
+    /// file, but they still finish by replacing the same destination — and on
+    /// Windows the second <c>MoveFileEx</c> can fail with access denied while the
+    /// first is in flight. This is not rare: it failed four runs in six on a
+    /// developer machine, and it surfaces in the app as a tile that never renders.
+    ///
+    /// The comment on the temp name always claimed the duplicate work was "wasted
+    /// but harmless". It was not harmless, because nothing implemented the
+    /// harmless part. This does: if the destination is usable, the other thread
+    /// won and the loser's work is simply redundant.
+    /// </summary>
+    private static void Publish(string tempPath, string thumbPath)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Move(tempPath, thumbPath, overwrite: true);
+                return;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // The winner moved a complete temp file, so a destination that
+                // passes the SOI check is whole rather than half-written.
+                if (IsUsable(thumbPath))
+                {
+                    try { File.Delete(tempPath); } catch (IOException) { }
+                    return;
+                }
+
+                // Deciding on a single probe is not enough. IsUsable opens the
+                // file, so while the winner's replace is still in flight it hits a
+                // sharing violation and reports unusable — a capture that is about
+                // to be perfectly fine. Retrying cut the residual failure rate from
+                // 1-in-8 to none in 40 runs.
+                if (attempt >= 4) throw;
+                Thread.Sleep(20);
+            }
         }
     }
 

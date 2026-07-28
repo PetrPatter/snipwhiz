@@ -45,34 +45,14 @@ public class ClipboardFormatTests : IDisposable
 
     /// <summary>
     /// The clipboard is an apartment-threaded API; xUnit runs on the pool, which
-    /// is MTA. Rather than take a dependency for one attribute, the work runs on
-    /// an STA thread and any failure is rethrown here.
+    /// is MTA. <see cref="Sta"/> owns the thread; this adds the format read that
+    /// has to happen on the same thread as the write.
     /// </summary>
-    private static string[] OnStaThread(Action action)
+    private static string[] OnStaThread(Action action) => Sta.Run(() =>
     {
-        string[] formats = [];
-        Exception? failure = null;
-
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-                formats = System.Windows.Forms.Clipboard.GetDataObject()?.GetFormats(autoConvert: false) ?? [];
-            }
-            catch (Exception e)
-            {
-                failure = e;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join(TimeSpan.FromSeconds(20));
-
-        if (failure is not null) throw new Xunit.Sdk.XunitException(failure.ToString());
-        return formats;
-    }
+        action();
+        return System.Windows.Forms.Clipboard.GetDataObject()?.GetFormats(autoConvert: false) ?? [];
+    });
 
     [Fact]
     public void A_capture_is_published_as_png_dibv5_dib_and_a_file()

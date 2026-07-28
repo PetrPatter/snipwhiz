@@ -23,6 +23,7 @@ public partial class PreviewView : System.Windows.Controls.UserControl
     public event Action? Dismissed;
     public event Action<CaptureRecord>? CopyRequested;
     public event Action<CaptureRecord>? DeleteRequested;
+    public event Action<CaptureRecord>? EditRequested;
 
     public PreviewView() : this(null!) { }   // designer only
 
@@ -33,6 +34,14 @@ public partial class PreviewView : System.Windows.Controls.UserControl
 
         BackButton.Click += (_, _) => Close();
         CopyButton.Click += (_, _) => Copy();
+        EditButton.Click += (_, _) =>
+        {
+            var record = _record;
+            if (record is null) return;
+            Close();
+            EditRequested?.Invoke(record);
+        };
+
         DeleteButton.Click += (_, _) =>
         {
             // Captured before Close clears it — the handler runs after.
@@ -71,7 +80,9 @@ public partial class PreviewView : System.Windows.Controls.UserControl
         var cts = new CancellationTokenSource();
         _pending = cts;
 
-        var path = _store.ResolvePath(record);
+        // Display, not the original: the preview is what the user opened the tile
+        // to look at, so it shows the annotations if there are any.
+        var path = _store.Assets.Display(record);
         try
         {
             // The full PNG, not the thumbnail scaled up: a lossy 320px preview
