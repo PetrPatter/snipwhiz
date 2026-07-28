@@ -140,6 +140,7 @@ public partial class App : Application
     private LibraryWindow? _library;
 
     private ThumbnailCache? _thumbnails;
+    private Editor.SavePipeline? _saves;
 
     private void ShowLibrary()
     {
@@ -148,6 +149,16 @@ public partial class App : Application
         {
             _library = new LibraryWindow(_store!, _thumbnails);
             _library.EditRequested += ShowEditor;
+
+            _saves = new Editor.SavePipeline(_store!, _thumbnails, Dispatcher);
+            _saves.Saved += saved => _library!.OnEditSaved(saved);
+            _saves.RenderFailed += (_, e) => _tray?.ShowBalloon(
+                "Couldn't render the edited image",
+                "Your annotations are saved. The library will show the original until the next save.",
+                isError: true);
+
+            _library.EditorSaveRequested += (record, document, source) =>
+                _saves!.Save(record, document, source);
         }
         _library.Reveal();
     }

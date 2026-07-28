@@ -26,7 +26,40 @@ public static class ProjectStore
 {
     private static readonly JsonWriterOptions WriterOptions = new() { Indented = true };
 
-    public static void Save(string path, SceneDocument document)
+    public static void Save(string path, SceneDocument document) =>
+        SaveText(path, Serialize(document));
+
+    /// <summary>
+    /// The document as it would be written, without writing it.
+    ///
+    /// <para>Exists so the save pipeline can take a snapshot on the UI thread —
+    /// where the scene is only ever touched — and hand a string to the background
+    /// thread that writes and renders it. Passing the live
+    /// <see cref="SceneDocument"/> instead would let a flatten read a scene the
+    /// user is still editing.</para>
+    /// </summary>
+    public static string Serialize(SceneDocument document)
+    {
+        using var buffer = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(buffer, WriterOptions)) Write(writer, document);
+        return System.Text.Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    /// <summary>Reads back what <see cref="Serialize"/> produced, as an independent object graph.</summary>
+    public static SceneDocument Parse(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return Read(document.RootElement);
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or FormatException or InvalidOperationException)
+        {
+            throw new ProjectFormatException("Not a readable Snipwhiz project.", e);
+        }
+    }
+
+    public static void SaveText(string path, string json)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
@@ -36,11 +69,7 @@ public static class ProjectStore
         var temp = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
-            using (var stream = File.Create(temp))
-            using (var writer = new Utf8JsonWriter(stream, WriterOptions))
-            {
-                Write(writer, document);
-            }
+            File.WriteAllText(temp, json);
             File.Move(temp, path, overwrite: true);
         }
         catch

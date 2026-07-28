@@ -143,7 +143,7 @@ public partial class LibraryWindow : Window
         {
             _editor = new Editor.EditorView(_store);
             _editor.ExitRequested += ShowLibraryScreen;
-            _editor.SaveRequested += (r, d) => EditorSaveRequested?.Invoke(r, d);
+            _editor.SaveRequested += (r, d, s) => EditorSaveRequested?.Invoke(r, d, s);
             EditorHost.Content = _editor;
         }
 
@@ -152,8 +152,11 @@ public partial class LibraryWindow : Window
         _editor.FocusCanvas();
     }
 
-    /// <summary>Forwarded from the editor so App can own the save pipeline (task 11).</summary>
-    public event Action<CaptureRecord, SceneDocument>? EditorSaveRequested;
+    /// <summary>Forwarded from the editor so App can own the save pipeline.</summary>
+    public event Action<CaptureRecord, SceneDocument, BitmapSource>? EditorSaveRequested;
+
+    /// <summary>A save finished. Task 12 makes the tile show it.</summary>
+    public void OnEditSaved(CaptureRecord saved) => _editor?.OnSaved(saved);
 
     private void ShowLibraryScreen()
     {

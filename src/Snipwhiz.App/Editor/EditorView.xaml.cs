@@ -58,7 +58,9 @@ public partial class EditorView : UserControl
     /// The document should be written. Task 11 gives this a save pipeline; until
     /// then nothing listens and nothing is persisted.
     /// </summary>
-    public event Action<CaptureRecord, SceneDocument>? SaveRequested;
+    public event Action<CaptureRecord, SceneDocument, BitmapSource>? SaveRequested;
+
+    private BitmapSource? _source;
 
     /// <summary>Escape with nothing left to unwind. The shell decides where to go.</summary>
     public event Action? ExitRequested;
@@ -68,9 +70,15 @@ public partial class EditorView : UserControl
     /// <summary>Points the editor at a capture, saving whatever was open before.</summary>
     public void Open(CaptureRecord record, BitmapSource source)
     {
-        if (_record is not null && !ReferenceEquals(_record, record)) Save();
+        // By id, not by reference. The library hands over a fresh CaptureRecord
+        // instance every time — records are values — so a reference comparison
+        // treats re-opening the same capture as a document switch and saves a
+        // document nobody changed. Harmless when the render works, and it
+        // announced itself the moment the render did not.
+        if (_record is not null && _record.Id != record.Id) Save();
 
         _record = record;
+        _source = source;
         _document = LoadProject(record);
         _undo = new UndoStack(_document);
 
@@ -85,8 +93,18 @@ public partial class EditorView : UserControl
 
     public void Save()
     {
-        if (_record is null) return;
-        SaveRequested?.Invoke(_record, _document);
+        if (_record is null || _source is null) return;
+        SaveRequested?.Invoke(_record, _document, _source);
+    }
+
+    /// <summary>
+    /// Points this view at the record the save produced, so a second save records
+    /// paths against a row that already has them rather than re-deriving from a
+    /// stale one.
+    /// </summary>
+    public void OnSaved(CaptureRecord saved)
+    {
+        if (_record?.Id == saved.Id) _record = saved;
     }
 
     /// <summary>Takes keyboard focus, so shortcuts reach the canvas rather than the grid.</summary>
