@@ -29,6 +29,15 @@
   -->
   <ItemGroup>
     <Using Include="System.IO" />
+    <!--
+      System.Drawing arrives implicitly with UseWindowsForms and shadows the WPF
+      types the annotation model is built from: Point, Size, Color, Brush and Pen
+      all exist in both. Removed from the implicit set so WPF wins by default, and
+      imported explicitly by the four files that genuinely want GDI+ — all of them
+      imaging code that predates the editor. The alternative was aliasing five WPF
+      types in every one of the ~15 annotation classes still to come.
+    -->
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
   <ItemGroup>
