@@ -62,6 +62,13 @@ public partial class EditorView : UserControl
 
     private BitmapSource? _source;
 
+    /// <summary>
+    /// The document must be on disk before this call returns. Raised when the
+    /// window is closing, where the normal background save would be killed with
+    /// the process.
+    /// </summary>
+    public event Action<CaptureRecord, SceneDocument>? UrgentSaveRequested;
+
     /// <summary>Escape with nothing left to unwind. The shell decides where to go.</summary>
     public event Action? ExitRequested;
 
@@ -79,6 +86,11 @@ public partial class EditorView : UserControl
 
         _record = record;
         _source = source;
+
+        // The memory gate's negative control: keeps every source the editor is ever
+        // given, modelling something in the app retaining them.
+        if (Diagnostics.EditorMemoryVerification.BreakRelease)
+            Diagnostics.EditorMemoryVerification.Retain(source);
         _document = LoadProject(record);
         _undo = new UndoStack(_document);
 
@@ -105,6 +117,13 @@ public partial class EditorView : UserControl
     public void OnSaved(CaptureRecord saved)
     {
         if (_record?.Id == saved.Id) _record = saved;
+    }
+
+    /// <summary>Blocks until the work is on disk. Only for the closing path.</summary>
+    public void SaveNow()
+    {
+        if (_record is null) return;
+        UrgentSaveRequested?.Invoke(_record, _document);
     }
 
     /// <summary>Takes keyboard focus, so shortcuts reach the canvas rather than the grid.</summary>

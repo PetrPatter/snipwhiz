@@ -96,6 +96,12 @@ public partial class App : Application
                 return;
             }
 
+            if (Diagnostics.EditorMemoryVerification.IsEnabled)
+            {
+                Diagnostics.EditorMemoryVerification.RunIfRequested(_store);
+                return;
+            }
+
             // The grid and resize gates drive the window themselves, so they need
             // it open without waiting for someone to press the hotkey.
             if (Diagnostics.GridVerification.IsEnabled || Diagnostics.ResizeVerification.IsEnabled)
@@ -165,6 +171,8 @@ public partial class App : Application
 
             _library.EditorSaveRequested += (record, document, source) =>
                 _saves!.Save(record, document, source);
+            _library.EditorUrgentSaveRequested += (record, document) =>
+                _saves!.SaveProjectNow(record, document);
         }
         _library.Reveal();
     }

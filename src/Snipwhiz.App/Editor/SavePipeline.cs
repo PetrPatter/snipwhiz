@@ -54,6 +54,32 @@ internal sealed class SavePipeline(CaptureStore store, ThumbnailCache thumbnails
         thread.Start();
     }
 
+    /// <summary>
+    /// Writes the project on the calling thread and skips the render.
+    ///
+    /// <para>For shutdown, where the normal path cannot be used: its worker is a
+    /// background thread, so the process exits out from under it and the
+    /// annotations are lost. The render is skipped rather than waited for — it is
+    /// derived from the project, and <c>Display</c> falls back to the original
+    /// until the next save produces one.</para>
+    /// </summary>
+    public void SaveProjectNow(CaptureRecord record, SceneDocument document)
+    {
+        try
+        {
+            var projectPath = store.Assets.Project(record.Id);
+            ProjectStore.Save(projectPath, document);
+            store.SetEditPaths(
+                record.Id, Relative(projectPath), record.FlatPath,
+                record.FlatWidth, record.FlatHeight, DateTimeOffset.UtcNow);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Shutting down. There is nowhere useful to report this, and throwing
+            // would take the process down harder than the failure warrants.
+        }
+    }
+
     private void Run(CaptureRecord record, string json, BitmapSource source)
     {
         lock (Gate)

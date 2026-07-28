@@ -144,6 +144,7 @@ public partial class LibraryWindow : Window
             _editor = new Editor.EditorView(_store);
             _editor.ExitRequested += ShowLibraryScreen;
             _editor.SaveRequested += (r, d, s) => EditorSaveRequested?.Invoke(r, d, s);
+            _editor.UrgentSaveRequested += (r, d) => EditorUrgentSaveRequested?.Invoke(r, d);
             EditorHost.Content = _editor;
         }
 
@@ -154,6 +155,9 @@ public partial class LibraryWindow : Window
 
     /// <summary>Forwarded from the editor so App can own the save pipeline.</summary>
     public event Action<CaptureRecord, SceneDocument, BitmapSource>? EditorSaveRequested;
+
+    /// <summary>Must complete before the window goes. See <see cref="OnClosing"/>.</summary>
+    public event Action<CaptureRecord, SceneDocument>? EditorUrgentSaveRequested;
 
     /// <summary>
     /// A save finished: point the editor and the grid at the capture as it now
@@ -488,6 +492,13 @@ public partial class LibraryWindow : Window
     // its grid, re-query, and re-fetch every thumbnail on the next open.
     protected override void OnClosing(CancelEventArgs e)
     {
+        // Both paths, before anything else. Dismissing the window while the Edit
+        // screen is up used to drop the annotations on the floor: the normal save
+        // runs on a background thread, and on shutdown the process exits out from
+        // under it. "There is no unsaved state" has to hold here too, or it is
+        // just a slogan.
+        if (IsEditing) _editor?.SaveNow();
+
         if (AllowClose)
         {
             FlushPendingDeletes();
