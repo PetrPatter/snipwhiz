@@ -155,6 +155,35 @@ public sealed class CanvasHost : FrameworkElement
         }
     }
 
+    /// <summary>
+    /// The scene as the canvas is currently drawing it, at image scale.
+    ///
+    /// <para>For the WYSIWYG gate, and it renders the <i>same</i> visuals that are
+    /// on screen rather than building new ones — a comparison against a fresh
+    /// render would only prove the flattener agrees with itself.</para>
+    ///
+    /// <para>The view transform is set aside for the duration so the result is in
+    /// image pixels, which is the space the flattener works in. Zoom and pan are
+    /// how the scene is <i>looked at</i>, not what it is.</para>
+    /// </summary>
+    internal BitmapSource RenderSceneAtImageScale()
+    {
+        var view = _root.Transform;
+        _root.Transform = System.Windows.Media.Transform.Identity;
+        try
+        {
+            var target = new RenderTargetBitmap(
+                (int)ImageSize.Width, (int)ImageSize.Height, 96, 96, PixelFormats.Pbgra32);
+            target.Render(_root);
+            target.Freeze();
+            return target;
+        }
+        finally
+        {
+            _root.Transform = view;
+        }
+    }
+
     /// <summary>Re-renders one object. Nothing else in the scene is touched.</summary>
     public void Invalidate(Annotation annotation)
     {

@@ -90,6 +90,12 @@ public partial class App : Application
                 return;
             }
 
+            if (Diagnostics.WysiwygVerification.IsEnabled)
+            {
+                Diagnostics.WysiwygVerification.RunIfRequested();
+                return;
+            }
+
             // The grid and resize gates drive the window themselves, so they need
             // it open without waiting for someone to press the hotkey.
             if (Diagnostics.GridVerification.IsEnabled || Diagnostics.ResizeVerification.IsEnabled)
