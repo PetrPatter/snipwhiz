@@ -165,9 +165,12 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
             preserveAspect: (modifiers & ModifierKeys.Shift) != 0,
             aboutCentre: (modifiers & ModifierKeys.Alt) != 0);
 
+        // The shape decides what its bounds mean. This used to build a rectangle's
+        // state unconditionally, which would have thrown the first time anyone
+        // resized an ellipse — and silently flipped a line end for end.
         undo.Apply(new ResizeAnnotation(
             _target, _startGeometry, _startTransform,
-            new RectangleGeometryState(resized.Size), resized.Transform));
+            _target.GeometryForBounds(resized.Size), resized.Transform));
 
         canvas.Invalidate(_target);
         canvas.RefreshOverlay();

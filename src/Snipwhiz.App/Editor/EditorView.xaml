@@ -56,6 +56,12 @@
                 <ToggleButton x:Name="RectToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE739;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Rectangle  (R)"/>
+                <ToggleButton x:Name="EllipseToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xEA3A;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Ellipse  (E)"/>
+                <ToggleButton x:Name="LineToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE738;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Line  (L)"/>
             </StackPanel>
         </Border>
 

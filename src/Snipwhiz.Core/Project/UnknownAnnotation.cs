@@ -40,5 +40,9 @@ public sealed class UnknownAnnotation : Annotation
 
     public override void RestoreGeometry(GeometryState state) { }
 
+    public override GeometryState GeometryForBounds(Size size) => new OpaqueGeometryState();
+
+    public override void Fit(Point from, Point to) { }
+
     public override void Render(DrawingContext dc) { }
 }

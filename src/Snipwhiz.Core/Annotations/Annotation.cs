@@ -69,6 +69,27 @@ public abstract class Annotation
     public abstract void RestoreGeometry(GeometryState state);
 
     /// <summary>
+    /// The geometry this object would have if its bounds were <paramref name="size"/>.
+    ///
+    /// <para>Resizing works in bounds because that is what handles describe, but
+    /// only a box-shaped annotation stores a size. A line stores a vector, and it
+    /// has to keep its direction while its extent changes. Without this the
+    /// selection tool has to know every shape's geometry type, and it did — it
+    /// built a rectangle's state unconditionally, which would have thrown the first
+    /// time anyone resized an ellipse.</para>
+    /// </summary>
+    public abstract GeometryState GeometryForBounds(Size size);
+
+    /// <summary>
+    /// Shapes this object to span two image-space points, unrotated.
+    ///
+    /// <para>What a create-by-drag gesture means, per shape: a box for a rectangle,
+    /// a vector for a line. Having each type answer it is what lets one tool draw
+    /// all of them.</para>
+    /// </summary>
+    public abstract void Fit(Point from, Point to);
+
+    /// <summary>
     /// Whether an image-space point lands on this object.
     ///
     /// <para>The point is pulled back through the <b>inverse</b> transform rather

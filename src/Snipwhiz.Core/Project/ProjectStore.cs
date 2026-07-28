@@ -147,6 +147,14 @@ public static class ProjectStore
                 w.WriteNumber("width", r.Size.Width);
                 w.WriteNumber("height", r.Size.Height);
                 break;
+            case EllipseAnnotation e:
+                w.WriteNumber("width", e.Size.Width);
+                w.WriteNumber("height", e.Size.Height);
+                break;
+            case LineAnnotation line:
+                w.WriteNumber("dx", line.Delta.X);
+                w.WriteNumber("dy", line.Delta.Y);
+                break;
             default:
                 throw new ProjectFormatException($"No serializer for {a.GetType().Name}.");
         }
@@ -158,6 +166,8 @@ public static class ProjectStore
     private static string TagOf(Annotation a) => a switch
     {
         RectangleAnnotation => "rectangle",
+        EllipseAnnotation => "ellipse",
+        LineAnnotation => "line",
         _ => throw new ProjectFormatException($"No type tag for {a.GetType().Name}."),
     };
 
@@ -195,7 +205,7 @@ public static class ProjectStore
         var id = e.GetProperty("id").GetGuid();
         var z = e.GetProperty("z").GetInt32();
 
-        if (tag != "rectangle")
+        if (tag is not ("rectangle" or "ellipse" or "line"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -203,16 +213,28 @@ public static class ProjectStore
         }
 
         var geometry = e.GetProperty("geometry");
-        return new RectangleAnnotation
+
+        return tag switch
         {
-            Id = id,
-            ZIndex = z,
-            Transform = transform,
-            Style = style,
-            Size = new Size(geometry.GetProperty("width").GetDouble(),
-                            geometry.GetProperty("height").GetDouble()),
+            "rectangle" => new RectangleAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "ellipse" => new EllipseAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            _ => new LineAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style,
+                Delta = new Vector(geometry.GetProperty("dx").GetDouble(),
+                                   geometry.GetProperty("dy").GetDouble()),
+            },
         };
     }
+
+    private static Size ReadSize(JsonElement geometry) =>
+        new(geometry.GetProperty("width").GetDouble(), geometry.GetProperty("height").GetDouble());
 
     private static Matrix ReadMatrix(JsonElement e)
     {

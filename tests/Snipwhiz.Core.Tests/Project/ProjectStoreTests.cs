@@ -82,6 +82,41 @@ public class ProjectStoreTests : IDisposable
         Assert.Null(ProjectStore.Load(path).Crop);
     }
 
+    [Fact]
+    public void An_ellipse_and_a_line_survive_a_round_trip()
+    {
+        var ellipse = new EllipseAnnotation
+        {
+            ZIndex = 1,
+            Size = new Size(180, 90),
+            Transform = new Matrix(1, 0, 0, 1, 200, 150),
+            Style = AnnotationStyle.Default with { Fill = Colors.Teal },
+        };
+
+        var line = new LineAnnotation
+        {
+            ZIndex = 2,
+            // Negative both ways: a format that stored bounds rather than a vector
+            // would come back pointing the other way.
+            Delta = new Vector(-140, -60),
+            Transform = new Matrix(1, 0, 0, 1, 400, 300),
+        };
+
+        var path = Path_("shapes.ssproj");
+        ProjectStore.Save(path, Scene(ellipse, line));
+        var loaded = ProjectStore.Load(path);
+
+        var loadedEllipse = Assert.IsType<EllipseAnnotation>(loaded.Annotations[0]);
+        Assert.Equal(ellipse.Id, loadedEllipse.Id);
+        Assert.Equal(new Size(180, 90), loadedEllipse.Size);
+        Assert.Equal(Colors.Teal, loadedEllipse.Style.Fill);
+
+        var loadedLine = Assert.IsType<LineAnnotation>(loaded.Annotations[1]);
+        Assert.Equal(line.Id, loadedLine.Id);
+        Assert.Equal(new Vector(-140, -60), loadedLine.Delta);
+        Assert.Equal(2, loadedLine.ZIndex);
+    }
+
     // ---- the golden file --------------------------------------------------
 
     /// <summary>

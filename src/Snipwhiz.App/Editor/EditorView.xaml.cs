@@ -43,7 +43,9 @@ public partial class EditorView : UserControl
         _undo = new UndoStack(_document);
 
         SelectToolButton.Click += (_, _) => UseSelect();
-        RectToolButton.Click += (_, _) => UseRectangle();
+        RectToolButton.Click += (_, _) => UseShape(RectToolButton, () => new RectangleAnnotation());
+        EllipseToolButton.Click += (_, _) => UseShape(EllipseToolButton, () => new EllipseAnnotation());
+        LineToolButton.Click += (_, _) => UseShape(LineToolButton, () => new LineAnnotation());
 
         Canvas.SelectionChanged += RefreshStatus;
         Canvas.MouseLeftButtonDown += OnCanvasPress;
@@ -170,23 +172,25 @@ public partial class EditorView : UserControl
         SetToolChecked(SelectToolButton);
     }
 
-    private void UseRectangle()
+    private void UseShape(ToggleButton button, Func<Annotation> create)
     {
-        var rectangle = new RectangleTool(Canvas, _document, _undo);
+        var shape = new ShapeTool(Canvas, _document, _undo, create, Cursors.Cross);
         // One shape per press of the tool, then back to selecting — the object you
         // just drew is almost always the one you want to adjust.
-        rectangle.Finished += _ => UseSelect();
-        _tool = rectangle;
-        SetToolChecked(RectToolButton);
+        shape.Finished += _ => UseSelect();
+        _tool = shape;
+        SetToolChecked(button);
     }
 
-    private void SetToolChecked(ToggleButton active)
+    private void SetToolChecked(ToggleButton? active)
     {
-        SelectToolButton.IsChecked = ReferenceEquals(active, SelectToolButton);
-        RectToolButton.IsChecked = ReferenceEquals(active, RectToolButton);
+        foreach (var button in ToolButtons) button.IsChecked = ReferenceEquals(button, active);
         Canvas.Cursor = _tool.Cursor;
         RefreshStatus();
     }
+
+    private ToggleButton[] ToolButtons =>
+        [SelectToolButton, RectToolButton, EllipseToolButton, LineToolButton];
 
     // ---- pointer ----------------------------------------------------------
 
@@ -250,7 +254,9 @@ public partial class EditorView : UserControl
             case Key.OemCloseBrackets: Reorder(+1); break;
 
             case Key.V when !control: UseSelect(); break;
-            case Key.R when !control: UseRectangle(); break;
+            case Key.R when !control: UseShape(RectToolButton, () => new RectangleAnnotation()); break;
+            case Key.E when !control: UseShape(EllipseToolButton, () => new EllipseAnnotation()); break;
+            case Key.L when !control: UseShape(LineToolButton, () => new LineAnnotation()); break;
 
             case Key.Left: Nudge(-Step(shift), 0); break;
             case Key.Right: Nudge(Step(shift), 0); break;
