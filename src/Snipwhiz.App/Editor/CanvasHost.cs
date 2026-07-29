@@ -68,6 +68,9 @@ public sealed class CanvasHost : FrameworkElement
 
     public event Action? SelectionChanged;
 
+    /// <summary>Zoom or pan changed. Anything positioned in element space has to move with it.</summary>
+    public event Action? ViewChanged;
+
     public void SetSelection(IEnumerable<Annotation> annotations)
     {
         _selection.Clear();
@@ -291,6 +294,7 @@ public sealed class CanvasHost : FrameworkElement
         _root.Transform = new MatrixTransform(view);
         // Handles are positioned from image space, so they move when the view does.
         RefreshOverlay();
+        ViewChanged?.Invoke();
     }
 
     // ---- navigation input -------------------------------------------------

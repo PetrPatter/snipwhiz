@@ -11,6 +11,10 @@ using Snipwhiz.Core.Project;
 using Snipwhiz.Core.Scene;
 using Snipwhiz.Core.Storage;
 
+// The field named Canvas is the drawing surface, so the panel type needs saying
+// out loud wherever its attached properties are set.
+using WpfCanvas = System.Windows.Controls.Canvas;
+
 namespace Snipwhiz.App.Editor;
 
 /// <summary>
@@ -33,14 +37,17 @@ public partial class EditorView : UserControl
     private UndoStack _undo;
     private CaptureRecord? _record;
     private ITool _tool = null!;
+    private readonly ToolDefaults _defaults;
 
-    public EditorView() : this(null!) { }   // designer only
+    public EditorView() : this(null!, new Core.Settings(), Path.GetTempPath()) { }   // designer only
 
-    public EditorView(CaptureStore store)
+    public EditorView(CaptureStore store, Core.Settings settings, string root)
     {
         InitializeComponent();
         _store = store;
+        _defaults = new ToolDefaults(settings, root);
         _undo = new UndoStack(_document);
+        BuildPill();
 
         SelectToolButton.Click += (_, _) => UseSelect();
         RectToolButton.Click += (_, _) => UseShape(RectToolButton, () => new RectangleAnnotation());
@@ -50,6 +57,7 @@ public partial class EditorView : UserControl
         HighlightToolButton.Click += (_, _) => UseShape(HighlightToolButton, () => new HighlightAnnotation());
 
         Canvas.SelectionChanged += RefreshStatus;
+        Canvas.ViewChanged += RefreshStatus;   // panning moves the pill too
         Canvas.MouseLeftButtonDown += OnCanvasPress;
         Canvas.MouseMove += OnCanvasDrag;
         Canvas.MouseLeftButtonUp += OnCanvasRelease;
@@ -176,7 +184,10 @@ public partial class EditorView : UserControl
 
     private void UseShape(ToggleButton button, Func<Annotation> create)
     {
-        var shape = new ShapeTool(Canvas, _document, _undo, create, Cursors.Cross);
+        // The remembered style is applied to each new object rather than baked into
+        // the factory, so the tool picks up a change made since it was selected.
+        var shape = new ShapeTool(
+            Canvas, _document, _undo, () => _defaults.Apply(create()), Cursors.Cross);
         // One shape per press of the tool, then back to selecting — the object you
         // just drew is almost always the one you want to adjust.
         shape.Finished += _ => UseSelect();
@@ -200,6 +211,159 @@ public partial class EditorView : UserControl
     /// Clicking hid it, because a <see cref="ToggleButton"/> flips itself.</para>
     /// </summary>
     private IEnumerable<ToggleButton> ToolButtons => ToolRail.Children.OfType<ToggleButton>();
+
+    // ---- the style pill ---------------------------------------------------
+
+    /// <summary>
+    /// Seven colours, not a colour picker. The pill is meant to be used without
+    /// looking at it; a full picker belongs behind one of these, later.
+    /// </summary>
+    private static readonly Color[] Palette =
+    [
+        Color.FromRgb(0xE5, 0x48, 0x4D),   // the default accent
+        Color.FromRgb(0xE8, 0x83, 0x3A),
+        Color.FromRgb(0xFF, 0xE0, 0x2B),   // the highlighter's yellow
+        Color.FromRgb(0x2F, 0xB3, 0x44),
+        Color.FromRgb(0x3B, 0x82, 0xF6),
+        Color.FromRgb(0xF5, 0xF2, 0xEC),
+        Color.FromRgb(0x1C, 0x1B, 0x1A),
+    ];
+
+    /// <summary>Clears the rotate handle, which sits 26px above the top edge.</summary>
+    private const double PillGap = 38;
+
+    private const double PillEdge = 8;
+
+    /// <summary>
+    /// True while the pill is being set <i>from</i> the selection. Without it the
+    /// slider's own ValueChanged would echo straight back as an edit, so selecting
+    /// an object would restyle it to the width it already had.
+    /// </summary>
+    private bool _syncingPill;
+
+    private void BuildPill()
+    {
+        foreach (var colour in Palette)
+        {
+            var fill = new SolidColorBrush(colour);
+            fill.Freeze();
+
+            var swatch = new Border
+            {
+                Width = 18,
+                Height = 18,
+                CornerRadius = new CornerRadius(9),
+                Background = fill,
+                BorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xF5, 0xF2, 0xEC)),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 5, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = ColourHex.Write(colour),
+            };
+
+            // Stroke always; fill only where there already was one. That means "make
+            // this thing this colour" without a switch on the annotation's type,
+            // which §4.4 exists to avoid: an outline recolours its outline, a
+            // highlight recolours the wash you actually see.
+            swatch.MouseLeftButtonDown += (_, _) => Restyle(style => style with
+            {
+                Stroke = colour,
+                Fill = style.Fill is null ? null : colour,
+            });
+
+            SwatchRow.Children.Add(swatch);
+        }
+
+        WidthSlider.ValueChanged += (_, e) =>
+        {
+            WidthText.Text = $"{e.NewValue:F0}";
+            Restyle(style => style with { StrokeWidth = e.NewValue });
+        };
+
+        // One undo entry per gesture. RestyleAnnotation absorbs consecutive restyles
+        // of the same object, so without a boundary here two separate swatch clicks
+        // would collapse into one step; with it, a slider drag is still one.
+        StylePill.PreviewMouseLeftButtonDown += (_, _) => _undo.BeginGesture();
+
+        // Persisted at the end of the gesture. Remember() runs on every tick;
+        // twenty file writes for one slider drag is not worth the immediacy.
+        StylePill.PreviewMouseLeftButtonUp += (_, _) => _defaults.Persist();
+    }
+
+    private void Restyle(Func<AnnotationStyle, AnnotationStyle> change)
+    {
+        if (_syncingPill || Canvas.Selection.Count != 1) return;
+
+        var target = Canvas.Selection[0];
+        var before = target.Style;
+        var after = change(before);
+        if (after == before) return;   // a record, so this is value equality
+
+        _undo.Apply(new RestyleAnnotation(target, before, after));
+        Canvas.Invalidate(target);
+        _defaults.Remember(target);
+    }
+
+    private void UpdatePill()
+    {
+        // Single selection only, matching the handles. With several selected, one
+        // RestyleAnnotation per object means Ctrl+Z unwinds the recolour an object
+        // at a time, because the undo stack absorbs per annotation. Multi-select
+        // styling belongs with multi-select transforms in phase E.
+        if (Canvas.Selection.Count != 1)
+        {
+            StylePill.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var target = Canvas.Selection[0];
+
+        _syncingPill = true;
+        try
+        {
+            WidthSlider.Value = Math.Clamp(
+                target.Style.StrokeWidth, WidthSlider.Minimum, WidthSlider.Maximum);
+            WidthText.Text = $"{target.Style.StrokeWidth:F0}";
+        }
+        finally
+        {
+            _syncingPill = false;
+        }
+
+        StylePill.Visibility = Visibility.Visible;
+        PositionPill(target);
+    }
+
+    private static readonly HandleKind[] PillCorners =
+        [HandleKind.TopLeft, HandleKind.TopRight, HandleKind.BottomRight, HandleKind.BottomLeft];
+
+    private void PositionPill(Annotation target)
+    {
+        // The four corners pushed through the transform, not Annotation.Bounds. A
+        // rotated object's axis-aligned bounds are larger than the object, and the
+        // pill would drift away from the thing it is editing as you turn it.
+        var box = Rect.Empty;
+        foreach (var kind in PillCorners)
+        {
+            box.Union(Canvas.ToElement(Handles.ImagePosition(target, kind, 0)));
+        }
+
+        StylePill.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var size = StylePill.DesiredSize;
+
+        var x = box.X + (box.Width - size.Width) / 2;
+        var y = box.Y - size.Height - PillGap;
+
+        // Flipped below when above would leave the viewport, then clamped both ways:
+        // a pill half off the side is no more usable than one off the top.
+        if (y < PillEdge) y = box.Bottom + PillGap;
+
+        x = Math.Clamp(x, PillEdge, Math.Max(PillEdge, PillLayer.ActualWidth - size.Width - PillEdge));
+        y = Math.Clamp(y, PillEdge, Math.Max(PillEdge, PillLayer.ActualHeight - size.Height - PillEdge));
+
+        WpfCanvas.SetLeft(StylePill, x);
+        WpfCanvas.SetTop(StylePill, y);
+    }
 
     // ---- pointer ----------------------------------------------------------
 
@@ -359,5 +523,10 @@ public partial class EditorView : UserControl
         StatusText.Text = selected > 0
             ? $"{selected} of {count} selected"
             : count == 1 ? "1 object" : $"{count} objects";
+
+        // Here rather than only on SelectionChanged: the pill has to follow the
+        // object through a move, a resize, a rotate, a zoom and a window resize, and
+        // every one of those already lands here.
+        UpdatePill();
     }
 }

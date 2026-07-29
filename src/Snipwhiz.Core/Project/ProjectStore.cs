@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using Snipwhiz.Core.Annotations;
 using Snipwhiz.Core.Scene;
+using Snipwhiz.Core.Storage;
 
 namespace Snipwhiz.Core.Project;
 
@@ -59,25 +60,12 @@ public static class ProjectStore
         }
     }
 
-    public static void SaveText(string path, string json)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-
-        // Written beside the target and moved into place. A crash part-way must not
-        // leave a truncated project that parses as an empty scene — losing the
-        // annotations is the one failure this format exists to prevent.
-        var temp = $"{path}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(temp, json);
-            File.Move(temp, path, overwrite: true);
-        }
-        catch
-        {
-            try { File.Delete(temp); } catch (IOException) { }
-            throw;
-        }
-    }
+    /// <summary>
+    /// Atomic, because a crash part-way must not leave a truncated project that
+    /// parses as an empty scene — losing the annotations is the one failure this
+    /// format exists to prevent.
+    /// </summary>
+    public static void SaveText(string path, string json) => AtomicFile.WriteAllText(path, json);
 
     public static SceneDocument Load(string path)
     {
@@ -165,7 +153,12 @@ public static class ProjectStore
         w.WriteEndObject();
     }
 
-    private static string TagOf(Annotation a) => a switch
+    /// <summary>
+    /// The name a type is stored under — and, because it is the same identity, the
+    /// key its remembered tool defaults live under in settings. A second name table
+    /// would be a second thing to keep in step.
+    /// </summary>
+    public static string TagOf(Annotation a) => a switch
     {
         HighlightAnnotation => "highlight",
         RectangleAnnotation => "rectangle",
@@ -303,18 +296,9 @@ public static class ProjectStore
         return new Rect(v[0], v[1], v[2], v[3]);
     }
 
-    /// <summary>Alpha is omitted when opaque, which is nearly always, so the common case reads as a familiar CSS colour.</summary>
-    private static string Hex(Color c) =>
-        c.A == 255 ? $"#{c.R:X2}{c.G:X2}{c.B:X2}" : $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+    // Colour text lives in ColourHex, shared with settings. FormatException from a
+    // bad colour is already wrapped as a ProjectFormatException by Load and Parse.
+    private static string Hex(Color c) => ColourHex.Write(c);
 
-    private static Color ParseHex(string? value)
-    {
-        var s = (value ?? "").TrimStart('#');
-        if (s.Length is not (6 or 8)) throw new ProjectFormatException($"'{value}' is not a colour.");
-
-        var n = uint.Parse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        return s.Length == 6
-            ? Color.FromRgb((byte)(n >> 16), (byte)(n >> 8), (byte)n)
-            : Color.FromArgb((byte)(n >> 24), (byte)(n >> 16), (byte)(n >> 8), (byte)n);
-    }
+    private static Color ParseHex(string? value) => ColourHex.Parse(value);
 }
