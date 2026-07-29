@@ -145,6 +145,10 @@ public static class ProjectStore
                 w.WriteNumber("dx", line.Delta.X);
                 w.WriteNumber("dy", line.Delta.Y);
                 break;
+            case TextAnnotation text:
+                w.WriteString("text", text.Text);
+                w.WriteNumber("fontSize", text.FontSize);
+                break;
             default:
                 throw new ProjectFormatException($"No serializer for {a.GetType().Name}.");
         }
@@ -161,6 +165,7 @@ public static class ProjectStore
     public static string TagOf(Annotation a) => a switch
     {
         HighlightAnnotation => "highlight",
+        TextAnnotation => "text",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
         // Before the line arm, not after: an arrow is a LineAnnotation and the first
@@ -206,7 +211,7 @@ public static class ProjectStore
         var id = e.GetProperty("id").GetGuid();
         var z = e.GetProperty("z").GetInt32();
 
-        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow"))
+        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -230,6 +235,12 @@ public static class ProjectStore
             "ellipse" => new EllipseAnnotation
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "text" => new TextAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style,
+                Text = geometry.GetProperty("text").GetString() ?? "",
+                FontSize = geometry.GetProperty("fontSize").GetDouble(),
             },
             "line" => new LineAnnotation
             {

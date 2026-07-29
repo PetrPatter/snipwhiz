@@ -105,6 +105,12 @@ public partial class App : Application
                 return;
             }
 
+            if (Diagnostics.TextSeamVerification.IsEnabled)
+            {
+                Diagnostics.TextSeamVerification.RunIfRequested();
+                return;
+            }
+
             if (Diagnostics.WysiwygVerification.IsEnabled)
             {
                 Diagnostics.WysiwygVerification.RunIfRequested();

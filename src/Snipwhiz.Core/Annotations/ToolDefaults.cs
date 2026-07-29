@@ -21,14 +21,25 @@ public sealed class ToolDefaults(Settings settings, string root)
     /// </summary>
     public Annotation Apply(Annotation annotation)
     {
-        if (settings.ToolStyles.TryGetValue(ProjectStore.TagOf(annotation), out var style))
-            annotation.Style = style;
+        var tag = ProjectStore.TagOf(annotation);
+
+        if (settings.ToolStyles.TryGetValue(tag, out var style)) annotation.Style = style;
+
+        // After the style, always. For a shape the two agree; for text the size is a
+        // font size the style does not carry, and applying it second means one order
+        // to reason about rather than two.
+        if (settings.ToolSizes.TryGetValue(tag, out var size)) annotation.SizeControl = size;
+
         return annotation;
     }
 
     /// <summary>Remembers in memory. Cheap, so it can run on every tick of a slider.</summary>
-    public void Remember(Annotation annotation) =>
-        settings.ToolStyles[ProjectStore.TagOf(annotation)] = annotation.Style;
+    public void Remember(Annotation annotation)
+    {
+        var tag = ProjectStore.TagOf(annotation);
+        settings.ToolStyles[tag] = annotation.Style;
+        settings.ToolSizes[tag] = annotation.SizeControl;
+    }
 
     /// <summary>
     /// Writes to disk. Called at the end of a gesture, not on every change — a

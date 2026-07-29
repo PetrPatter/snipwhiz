@@ -38,6 +38,7 @@ public partial class EditorView : UserControl
     private CaptureRecord? _record;
     private ITool _tool = null!;
     private readonly ToolDefaults _defaults;
+    private TextEditingOverlay _text = null!;
 
     public EditorView() : this(null!, new Core.Settings(), Path.GetTempPath()) { }   // designer only
 
@@ -48,6 +49,7 @@ public partial class EditorView : UserControl
         _defaults = new ToolDefaults(settings, root);
         _undo = new UndoStack(_document);
         BuildPill();
+        BuildTextEditing();
 
         SelectToolButton.Click += (_, _) => UseSelect();
         RectToolButton.Click += (_, _) => UseShape(RectToolButton, () => new RectangleAnnotation());
@@ -55,6 +57,7 @@ public partial class EditorView : UserControl
         LineToolButton.Click += (_, _) => UseShape(LineToolButton, () => new LineAnnotation());
         ArrowToolButton.Click += (_, _) => UseShape(ArrowToolButton, () => new ArrowAnnotation());
         HighlightToolButton.Click += (_, _) => UseShape(HighlightToolButton, () => new HighlightAnnotation());
+        TextToolButton.Click += (_, _) => UseShape(TextToolButton, () => new TextAnnotation());
 
         Canvas.SelectionChanged += RefreshStatus;
         Canvas.ViewChanged += RefreshStatus;   // panning moves the pill too
@@ -117,6 +120,11 @@ public partial class EditorView : UserControl
 
     public void Save()
     {
+        // Before anything reads the document. A text object mid-edit is drawing its
+        // plate and not its words, so flattening now would export a caption-shaped
+        // hole where the caption is.
+        _text.Commit();
+
         if (_record is null || _source is null) return;
         SaveRequested?.Invoke(_record, _document, _source);
     }
@@ -134,6 +142,7 @@ public partial class EditorView : UserControl
     /// <summary>Blocks until the work is on disk. Only for the closing path.</summary>
     public void SaveNow()
     {
+        _text.Commit();
         if (_record is null) return;
         UrgentSaveRequested?.Invoke(_record, _document);
     }
@@ -190,7 +199,14 @@ public partial class EditorView : UserControl
             Canvas, _document, _undo, () => _defaults.Apply(create()), Cursors.Cross);
         // One shape per press of the tool, then back to selecting — the object you
         // just drew is almost always the one you want to adjust.
-        shape.Finished += _ => UseSelect();
+        shape.Finished += created =>
+        {
+            UseSelect();
+            // A text object is created empty and is useless until it says something,
+            // so placing one goes straight into typing rather than leaving a bare
+            // plate selected and waiting to be discovered.
+            if (created is TextAnnotation text) _text.Begin(text);
+        };
         _tool = shape;
         SetToolChecked(button);
     }
@@ -211,6 +227,36 @@ public partial class EditorView : UserControl
     /// Clicking hid it, because a <see cref="ToggleButton"/> flips itself.</para>
     /// </summary>
     private IEnumerable<ToggleButton> ToolButtons => ToolRail.Children.OfType<ToggleButton>();
+
+    // ---- text editing -----------------------------------------------------
+
+    private void BuildTextEditing()
+    {
+        _text = new TextEditingOverlay(PillLayer, Canvas);
+
+        // One undo entry for a whole typing session. Every keystroke already went
+        // straight onto the annotation so the plate could grow as you type; this is
+        // what makes Ctrl+Z afterwards restore the string you started with rather
+        // than remove one letter.
+        _text.Committed += (target, before) =>
+        {
+            _undo.BeginGesture();
+            _undo.Apply(new ReshapeAnnotation(target, before, target.CaptureGeometry()));
+            RefreshStatus();
+        };
+
+        // Placed but never typed into. Left alone it is an invisible-ish plate that
+        // hit-tests and shows handles, which reads as the app having put something
+        // there by accident — which it did.
+        _text.Discarded += target =>
+        {
+            _undo.BeginGesture();
+            _undo.Apply(new RemoveAnnotation(target));
+            Canvas.ClearSelection();
+            Canvas.Rebuild();
+            RefreshStatus();
+        };
+    }
 
     // ---- the style pill ---------------------------------------------------
 
@@ -261,15 +307,10 @@ public partial class EditorView : UserControl
                 ToolTip = ColourHex.Write(colour),
             };
 
-            // Stroke always; fill only where there already was one. That means "make
-            // this thing this colour" without a switch on the annotation's type,
-            // which §4.4 exists to avoid: an outline recolours its outline, a
-            // highlight recolours the wash you actually see.
-            swatch.MouseLeftButtonDown += (_, _) => Restyle(style => style with
-            {
-                Stroke = colour,
-                Fill = style.Fill is null ? null : colour,
-            });
+            // The object decides what being made a colour means for it. Asking the
+            // toolbar to know would put the rule that broke text in the one place
+            // that happens to recolour things today.
+            swatch.MouseLeftButtonDown += (_, _) => Restyle((_, target) => target.Recoloured(colour));
 
             SwatchRow.Children.Add(swatch);
         }
@@ -277,7 +318,7 @@ public partial class EditorView : UserControl
         WidthSlider.ValueChanged += (_, e) =>
         {
             WidthText.Text = $"{e.NewValue:F0}";
-            Restyle(style => style with { StrokeWidth = e.NewValue });
+            ApplySize(e.NewValue);
         };
 
         // One undo entry per gesture. RestyleAnnotation absorbs consecutive restyles
@@ -290,18 +331,57 @@ public partial class EditorView : UserControl
         StylePill.PreviewMouseLeftButtonUp += (_, _) => _defaults.Persist();
     }
 
-    private void Restyle(Func<AnnotationStyle, AnnotationStyle> change)
+    private void Restyle(Func<AnnotationStyle, Annotation, AnnotationStyle> change)
     {
         if (_syncingPill || Canvas.Selection.Count != 1) return;
 
         var target = Canvas.Selection[0];
         var before = target.Style;
-        var after = change(before);
+        var after = change(before, target);
         if (after == before) return;   // a record, so this is value equality
 
         _undo.Apply(new RestyleAnnotation(target, before, after));
         Canvas.Invalidate(target);
         _defaults.Remember(target);
+    }
+
+    /// <summary>
+    /// Moves the size control, and records it against whichever half of the object
+    /// actually changed.
+    ///
+    /// <para>No type switch: a shape's size lives in its style and text's lives in
+    /// its geometry, so this sets the one number and then looks at what moved. Both
+    /// commands absorb, so a slider drag is still one undo entry either way.</para>
+    /// </summary>
+    private void ApplySize(double value)
+    {
+        if (_syncingPill || Canvas.Selection.Count != 1) return;
+
+        var target = Canvas.Selection[0];
+        var styleBefore = target.Style;
+        var geometryBefore = target.CaptureGeometry();
+
+        target.SizeControl = value;
+
+        if (target.Style != styleBefore)
+        {
+            _undo.Apply(new RestyleAnnotation(target, styleBefore, target.Style));
+        }
+        else if (!Equals(geometryBefore, target.CaptureGeometry()))
+        {
+            _undo.Apply(new ReshapeAnnotation(target, geometryBefore, target.CaptureGeometry()));
+        }
+        else
+        {
+            return;
+        }
+
+        Canvas.Invalidate(target);
+        // Text changes size as well as appearance, so the handles and the pill's own
+        // position have to follow it.
+        Canvas.RefreshOverlay();
+        _defaults.Remember(target);
+        PositionPill(target);
     }
 
     private void UpdatePill()
@@ -318,12 +398,19 @@ public partial class EditorView : UserControl
 
         var target = Canvas.Selection[0];
 
+        var (min, max) = target.SizeControlRange;
+
         _syncingPill = true;
         try
         {
-            WidthSlider.Value = Math.Clamp(
-                target.Style.StrokeWidth, WidthSlider.Minimum, WidthSlider.Maximum);
-            WidthText.Text = $"{target.Style.StrokeWidth:F0}";
+            // The range moves with the type: 0-24 reads as a stroke width and would
+            // let someone drag a caption down to 0pt, which is a caption that has
+            // vanished for the second time.
+            WidthSlider.Minimum = min;
+            WidthSlider.Maximum = max;
+            WidthSlider.Value = Math.Clamp(target.SizeControl, min, max);
+            WidthSlider.ToolTip = target.SizeControlLabel;
+            WidthText.Text = $"{target.SizeControl:F0}";
         }
         finally
         {
@@ -370,9 +457,26 @@ public partial class EditorView : UserControl
     private void OnCanvasPress(object sender, MouseButtonEventArgs e)
     {
         if (Canvas.IsPanning) return;
+
+        var image = Canvas.ToImage(e.GetPosition(Canvas));
+
+        // Double-click a caption to edit it, the way every canvas editor works.
+        // Checked before the tool sees the press, or the select tool starts a drag
+        // on the object the user is about to type into.
+        if (e.ClickCount == 2 && Canvas.HitTest(image) is TextAnnotation existing)
+        {
+            Canvas.SetSelection([existing]);
+            _text.Begin(existing);
+            return;
+        }
+
+        // A press anywhere else ends the edit. Committing on lost focus alone would
+        // miss it, because the canvas is not always what takes focus next.
+        _text.Commit();
+
         Canvas.Focus();
         Canvas.CaptureMouse();
-        _tool.OnPress(Canvas.ToImage(e.GetPosition(Canvas)), Keyboard.Modifiers);
+        _tool.OnPress(image, Keyboard.Modifiers);
     }
 
     private void OnCanvasDrag(object sender, MouseEventArgs e)
@@ -401,6 +505,13 @@ public partial class EditorView : UserControl
     /// </summary>
     public bool HandleKey(KeyEventArgs e)
     {
+        // Nothing while a text box has the keyboard. Every bare-letter shortcut
+        // below is also a letter someone is trying to type, and the window's KeyDown
+        // reaches here whether or not a TextBox is focused — a TextBox does not mark
+        // ordinary characters handled. Escape is already dealt with by the overlay's
+        // own PreviewKeyDown, which tunnels before this bubbles.
+        if (_text.IsEditing) return false;
+
         var control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
 
@@ -432,6 +543,7 @@ public partial class EditorView : UserControl
             case Key.L when !control: UseShape(LineToolButton, () => new LineAnnotation()); break;
             case Key.A when !control: UseShape(ArrowToolButton, () => new ArrowAnnotation()); break;
             case Key.H when !control: UseShape(HighlightToolButton, () => new HighlightAnnotation()); break;
+            case Key.T when !control: UseShape(TextToolButton, () => new TextAnnotation()); break;
 
             case Key.Left: Nudge(-Step(shift), 0); break;
             case Key.Right: Nudge(Step(shift), 0); break;
@@ -528,5 +640,6 @@ public partial class EditorView : UserControl
         // object through a move, a resize, a rotate, a zoom and a window resize, and
         // every one of those already lands here.
         UpdatePill();
+        _text.Reposition();
     }
 }

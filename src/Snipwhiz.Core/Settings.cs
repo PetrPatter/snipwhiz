@@ -26,6 +26,16 @@ public sealed class Settings
     /// </summary>
     public Dictionary<string, AnnotationStyle> ToolStyles { get; set; } = [];
 
+    /// <summary>
+    /// The size control's last value per tool, keyed the same way.
+    ///
+    /// <para>Separate from <see cref="ToolStyles"/> because for text it is a font
+    /// size, which lives in geometry rather than style. For a shape it duplicates
+    /// the style's stroke width — harmlessly, because both are written from the same
+    /// object in the same call, so they cannot disagree.</para>
+    /// </summary>
+    public Dictionary<string, double> ToolSizes { get; set; } = [];
+
     [JsonIgnore] private static string FileName => "settings.json";
 
     /// <summary>

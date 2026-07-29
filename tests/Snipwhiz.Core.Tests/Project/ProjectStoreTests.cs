@@ -184,6 +184,39 @@ public class ProjectStoreTests : IDisposable
         Assert.Equal(0.6, loaded.Style.Opacity);
     }
 
+    [Fact]
+    public void Text_and_its_font_size_survive_a_round_trip()
+    {
+        var text = new TextAnnotation
+        {
+            Text = "Line one\nLine two — an em dash, \"quotes\" and a \\ backslash",
+            FontSize = 31.5,
+            Transform = new Matrix(1, 0, 0, 1, 120, 90),
+        };
+
+        var path = Path_("text.ssproj");
+        ProjectStore.Save(path, Scene(text));
+        var loaded = Assert.IsType<TextAnnotation>(ProjectStore.Load(path).Annotations.Single());
+
+        // The string is the geometry here, so anything the JSON writer mangles is a
+        // caption that comes back wrong rather than a shape that comes back wonky.
+        Assert.Equal(text.Text, loaded.Text);
+        Assert.Equal(31.5, loaded.FontSize);
+    }
+
+    [Fact]
+    public void A_text_annotation_being_edited_still_saves_its_words()
+    {
+        // IsBeingEdited suppresses drawing, not storing. If it ever reached the
+        // writer, saving while a caption was open would persist an empty plate.
+        var text = new TextAnnotation { Text = "still here", IsBeingEdited = true };
+
+        var path = Path_("editing.ssproj");
+        ProjectStore.Save(path, Scene(text));
+
+        Assert.Equal("still here", ((TextAnnotation)ProjectStore.Load(path).Annotations.Single()).Text);
+    }
+
     // ---- the golden file --------------------------------------------------
 
     /// <summary>

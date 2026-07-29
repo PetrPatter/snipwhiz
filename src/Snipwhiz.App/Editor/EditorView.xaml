@@ -70,6 +70,9 @@
                 <ToggleButton x:Name="HighlightToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE7E6;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Highlight  (H)"/>
+                <ToggleButton x:Name="TextToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Text  (T)"/>
             </StackPanel>
         </Border>
 

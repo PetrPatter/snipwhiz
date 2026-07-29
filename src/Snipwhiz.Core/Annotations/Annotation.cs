@@ -39,6 +39,57 @@ public abstract class Annotation
     public AnnotationStyle Style { get; set; } = AnnotationStyle.Default;
 
     /// <summary>
+    /// Whether <see cref="AnnotationStyle.Fill"/> is this object's <i>body</i> or the
+    /// <i>backdrop behind</i> it. False for every shape; true for text.
+    ///
+    /// <para>Exists because "make this thing red" is one gesture with two meanings.
+    /// On a rectangle it means the rectangle; on text it means the words, and
+    /// painting the plate to match makes the caption vanish — which is exactly what
+    /// shipped, because the rule "set fill wherever there is one" had no
+    /// counter-example when it was written.</para>
+    ///
+    /// <para>Asked of the type rather than switched on by the toolbar, the same way
+    /// <see cref="GeometryForBounds"/> asks each shape what its bounds mean. §4.4
+    /// rejects a type switch per control, not a type answering for itself.</para>
+    /// </summary>
+    protected virtual bool FillIsBackdrop => false;
+
+    /// <summary>
+    /// This object's style made a given colour — whatever "this colour" means for
+    /// it. Stroke always; body fill too, but never a backdrop.
+    ///
+    /// <para>Here rather than in the toolbar so there is one answer per type instead
+    /// of one rule in the one place that happens to recolour things today.</para>
+    /// </summary>
+    public AnnotationStyle Recoloured(Color colour) => Style with
+    {
+        Stroke = colour,
+        Fill = Style.Fill is null || FillIsBackdrop ? Style.Fill : colour,
+    };
+
+    /// <summary>
+    /// The one number the style pill's size control edits.
+    ///
+    /// <para>Stroke width for a shape, font size for text. Named for the control
+    /// rather than for either meaning, because the control has one job and it is the
+    /// object that decides what that does to it — the same answer as
+    /// <see cref="Recoloured"/> and <see cref="GeometryForBounds"/>.</para>
+    ///
+    /// <para>Note that for a shape this lives in <see cref="Style"/> and for text it
+    /// lives in geometry. Callers do not need to know which: set it, then look at
+    /// what moved.</para>
+    /// </summary>
+    public virtual double SizeControl
+    {
+        get => Style.StrokeWidth;
+        set => Style = Style with { StrokeWidth = value };
+    }
+
+    public virtual (double Min, double Max) SizeControlRange => (0, 24);
+
+    public virtual string SizeControlLabel => "Stroke width";
+
+    /// <summary>
     /// The object's extent in its own space, centred on the origin.
     ///
     /// <para>Centred rather than origin-at-top-left so that rotation in

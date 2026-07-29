@@ -70,6 +70,39 @@ public class ToolDefaultsTests
     }
 
     [Fact]
+    public void The_size_control_means_stroke_width_on_a_shape_and_font_size_on_text()
+    {
+        // One control, two meanings, and the object supplies the meaning. Text draws
+        // no stroke at all, so before this the slider moved and nothing happened.
+        var rectangle = new RectangleAnnotation { Style = AnnotationStyle.Default with { StrokeWidth = 3 } };
+        Assert.Equal(3, rectangle.SizeControl);
+
+        rectangle.SizeControl = 9;
+        Assert.Equal(9, rectangle.Style.StrokeWidth);
+
+        var text = new TextAnnotation { FontSize = 28 };
+        Assert.Equal(28, text.SizeControl);
+
+        text.SizeControl = 44;
+        Assert.Equal(44, text.FontSize);
+        // And it must not have quietly become a stroke, which would outline the plate.
+        Assert.Equal(0, text.Style.StrokeWidth);
+    }
+
+    [Fact]
+    public void A_remembered_font_size_reaches_the_next_caption()
+    {
+        // Font size is geometry, not style, so remembering the style alone left new
+        // captions at the default while every shape kept its width.
+        var settings = new Settings();
+        var defaults = Defaults(settings);
+
+        defaults.Remember(new TextAnnotation { Text = "sized", FontSize = 52 });
+
+        Assert.Equal(52, ((TextAnnotation)defaults.Apply(new TextAnnotation())).FontSize);
+    }
+
+    [Fact]
     public void Remembering_survives_a_settings_round_trip()
     {
         var root = Path.Combine(Path.GetTempPath(), "snipwhiz-tooldefaults", Guid.NewGuid().ToString("N"));

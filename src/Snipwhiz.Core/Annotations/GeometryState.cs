@@ -25,5 +25,12 @@ public sealed record EllipseGeometryState(Size Size) : GeometryState;
 /// </summary>
 public sealed record LineGeometryState(Vector Delta) : GeometryState;
 
+/// <summary>
+/// Text carries its string as geometry, because the string is what decides the
+/// object's size — so undoing a typed word is a geometry change like any other and
+/// needs no command of its own.
+/// </summary>
+public sealed record TextGeometryState(string Text, double FontSize) : GeometryState;
+
 /// <summary>Carried by an annotation this build cannot interpret, and never edited.</summary>
 public sealed record OpaqueGeometryState : GeometryState;
