@@ -8,8 +8,11 @@ namespace Snipwhiz.Core.Annotations;
 /// whole foundation — create by drag, hit-test, select, resize from eight handles,
 /// rotate, undo, serialize, flatten, library refresh — with no text entry, pixel
 /// sampling or geometry subtleties to debug alongside it.
+///
+/// <para>Not sealed: <see cref="HighlightAnnotation"/> is this shape with a
+/// different default style.</para>
 /// </summary>
-public sealed class RectangleAnnotation : Annotation
+public class RectangleAnnotation : Annotation
 {
     /// <summary>
     /// Size in image pixels. Resizing changes this rather than a scale in

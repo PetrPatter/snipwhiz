@@ -244,11 +244,33 @@ A tool produces a command (§4.7); it never mutates the scene directly.
 |---|---|---|
 | Draw | arrow, line, pen, rectangle, ellipse, polygon | Shift constrains angle/aspect |
 | Speak | callout, text, step number | §4.8 for text entry |
-| Emphasis | highlight, spotlight | Multiply and dim-outside blends |
+| Emphasis | highlight, spotlight | ~~Multiply~~ translucent fill (see below), and dim-outside |
 | Redact | blur, pixelate | §4.9 — samples pixels |
 | Zoom | magnify | §4.9 — samples pixels |
 | Place | stamp | §4.10 on where assets come from |
 | Document | crop, cut-out, resize, border, edge effects | §4.10 — change the canvas |
+
+**Highlight's multiply blend is superseded, during phase B.** This section
+originally specified highlight as a *multiply* blend against the pixels beneath it.
+It ships as a **translucent filled rectangle** instead.
+
+`DrawingContext` has no blend modes. Getting one means a WPF `Effect`, and an
+`Effect` is applied by the visual tree — the flattener composites through
+`DrawingContext` and would not apply it. That is a **second render path**, which is
+the single failure §1 and the WYSIWYG gate exist to prevent: the highlight would
+look right on screen and wrong in the exported PNG, and the user would find out
+after sending the image. The trade is a slightly duller yellow over dark pixels
+against a guarantee that the export matches the canvas, and the guarantee is worth
+more than the yellow.
+
+Verified rather than asserted: the gate now carries a highlight at its shipping
+default with an arrow crossing it, and still diffs to **0 of 187,200 pixels**. Had
+this been built as an `Effect`, that number is what would have said so.
+
+The same reasoning applies in advance to **spotlight**, which §4.5 lists beside it.
+Dimming everything outside a region is four filled rectangles or one geometry with
+a hole, both of which `DrawingContext` draws directly — so spotlight keeps its
+described behaviour and needs no departure.
 
 The **contextual floating toolbar** is the design direction's headline move: tool
 options appear in a pill beside the selection, not in a permanent right-hand panel.

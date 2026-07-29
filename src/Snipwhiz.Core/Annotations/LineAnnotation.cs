@@ -15,8 +15,13 @@ namespace Snipwhiz.Core.Annotations;
 /// <para>Stored centred on its own midpoint, running from <c>-Delta/2</c> to
 /// <c>+Delta/2</c>, so rotation turns it about its middle exactly like every other
 /// annotation and needs no special case.</para>
+///
+/// <para>Not sealed: <see cref="ArrowAnnotation"/> is a line with a head, and the
+/// geometry, the direction-preserving resize and the segment hit-test are the same
+/// answer for both. Copying them would leave two versions of the sign handling in
+/// <see cref="GeometryForBounds"/> to drift apart.</para>
 /// </summary>
-public sealed class LineAnnotation : Annotation
+public class LineAnnotation : Annotation
 {
     /// <summary>End minus start. Its sign carries the direction, which resizing must not flip.</summary>
     public Vector Delta { get; set; }

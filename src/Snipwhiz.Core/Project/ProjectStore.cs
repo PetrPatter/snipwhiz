@@ -143,6 +143,7 @@ public static class ProjectStore
         w.WriteStartObject("geometry");
         switch (a)
         {
+            // Covers HighlightAnnotation too — it is a rectangle, same geometry.
             case RectangleAnnotation r:
                 w.WriteNumber("width", r.Size.Width);
                 w.WriteNumber("height", r.Size.Height);
@@ -151,6 +152,7 @@ public static class ProjectStore
                 w.WriteNumber("width", e.Size.Width);
                 w.WriteNumber("height", e.Size.Height);
                 break;
+            // Covers ArrowAnnotation too — it is a line, and stores the same vector.
             case LineAnnotation line:
                 w.WriteNumber("dx", line.Delta.X);
                 w.WriteNumber("dy", line.Delta.Y);
@@ -165,8 +167,14 @@ public static class ProjectStore
 
     private static string TagOf(Annotation a) => a switch
     {
+        HighlightAnnotation => "highlight",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
+        // Before the line arm, not after: an arrow is a LineAnnotation and the first
+        // matching pattern wins. Putting it second does not save arrows as lines —
+        // it does not compile (CS8510, unreachable pattern), which is the right
+        // place for this to be caught.
+        ArrowAnnotation => "arrow",
         LineAnnotation => "line",
         _ => throw new ProjectFormatException($"No type tag for {a.GetType().Name}."),
     };
@@ -205,7 +213,7 @@ public static class ProjectStore
         var id = e.GetProperty("id").GetGuid();
         var z = e.GetProperty("z").GetInt32();
 
-        if (tag is not ("rectangle" or "ellipse" or "line"))
+        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -220,18 +228,29 @@ public static class ProjectStore
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
             },
+            // Style comes from the file, not from HighlightAnnotation's default — a
+            // highlight the user recoloured must reopen the colour they chose.
+            "highlight" => new HighlightAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
             "ellipse" => new EllipseAnnotation
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
             },
-            _ => new LineAnnotation
+            "line" => new LineAnnotation
             {
-                Id = id, ZIndex = z, Transform = transform, Style = style,
-                Delta = new Vector(geometry.GetProperty("dx").GetDouble(),
-                                   geometry.GetProperty("dy").GetDouble()),
+                Id = id, ZIndex = z, Transform = transform, Style = style, Delta = ReadDelta(geometry),
+            },
+            _ => new ArrowAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Delta = ReadDelta(geometry),
             },
         };
     }
+
+    private static Vector ReadDelta(JsonElement geometry) =>
+        new(geometry.GetProperty("dx").GetDouble(), geometry.GetProperty("dy").GetDouble());
 
     private static Size ReadSize(JsonElement geometry) =>
         new(geometry.GetProperty("width").GetDouble(), geometry.GetProperty("height").GetDouble());

@@ -46,6 +46,8 @@ public partial class EditorView : UserControl
         RectToolButton.Click += (_, _) => UseShape(RectToolButton, () => new RectangleAnnotation());
         EllipseToolButton.Click += (_, _) => UseShape(EllipseToolButton, () => new EllipseAnnotation());
         LineToolButton.Click += (_, _) => UseShape(LineToolButton, () => new LineAnnotation());
+        ArrowToolButton.Click += (_, _) => UseShape(ArrowToolButton, () => new ArrowAnnotation());
+        HighlightToolButton.Click += (_, _) => UseShape(HighlightToolButton, () => new HighlightAnnotation());
 
         Canvas.SelectionChanged += RefreshStatus;
         Canvas.MouseLeftButtonDown += OnCanvasPress;
@@ -189,8 +191,15 @@ public partial class EditorView : UserControl
         RefreshStatus();
     }
 
-    private ToggleButton[] ToolButtons =>
-        [SelectToolButton, RectToolButton, EllipseToolButton, LineToolButton];
+    /// <summary>
+    /// Read off the rail rather than listed here.
+    ///
+    /// <para>A hand-written list is a second place to remember a new tool, and it
+    /// was already wrong: arrow and highlight were missing, so their buttons never
+    /// lit from a keyboard shortcut and never cleared when another tool was picked.
+    /// Clicking hid it, because a <see cref="ToggleButton"/> flips itself.</para>
+    /// </summary>
+    private IEnumerable<ToggleButton> ToolButtons => ToolRail.Children.OfType<ToggleButton>();
 
     // ---- pointer ----------------------------------------------------------
 
@@ -257,6 +266,8 @@ public partial class EditorView : UserControl
             case Key.R when !control: UseShape(RectToolButton, () => new RectangleAnnotation()); break;
             case Key.E when !control: UseShape(EllipseToolButton, () => new EllipseAnnotation()); break;
             case Key.L when !control: UseShape(LineToolButton, () => new LineAnnotation()); break;
+            case Key.A when !control: UseShape(ArrowToolButton, () => new ArrowAnnotation()); break;
+            case Key.H when !control: UseShape(HighlightToolButton, () => new HighlightAnnotation()); break;
 
             case Key.Left: Nudge(-Step(shift), 0); break;
             case Key.Right: Nudge(Step(shift), 0); break;
