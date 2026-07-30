@@ -15,7 +15,7 @@ namespace Snipwhiz.App.Editor.Tools;
 /// </summary>
 internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, UndoStack undo) : ITool
 {
-    private enum Gesture { None, Move, Resize, Rotate, Marquee }
+    private enum Gesture { None, Move, Resize, Rotate, Marquee, Control }
 
     private Gesture _gesture;
     private HandleKind _handle;
@@ -45,7 +45,13 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
             var handle = SelectionOverlay.HandleAt(canvas, canvas.Selection[0], element);
             if (handle is not HandleKind.None)
             {
-                Begin(canvas.Selection[0], handle is HandleKind.Rotate ? Gesture.Rotate : Gesture.Resize, image);
+                // The object says which of its handles are control points; this does
+                // not know what a tail is.
+                var gesture = canvas.Selection[0].ControlPoints.Contains(handle) ? Gesture.Control
+                    : handle is HandleKind.Rotate ? Gesture.Rotate
+                    : Gesture.Resize;
+
+                Begin(canvas.Selection[0], gesture, image);
                 _handle = handle;
                 return;
             }
@@ -95,6 +101,10 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
             case Gesture.Rotate:
                 RotateTarget(image, modifiers);
                 break;
+
+            case Gesture.Control:
+                DragControlPoint(image);
+                break;
         }
     }
 
@@ -113,7 +123,7 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
     {
         // The gesture was applied as commands, so taking it back is an undo rather
         // than a restore — and absorbing means the whole drag is one step.
-        if (_gesture is Gesture.Move or Gesture.Resize or Gesture.Rotate) undo.Undo();
+        if (_gesture is Gesture.Move or Gesture.Resize or Gesture.Rotate or Gesture.Control) undo.Undo();
 
         _gesture = Gesture.None;
         _target = null;
@@ -172,6 +182,28 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
             _target, _startGeometry, _startTransform,
             _target.GeometryForBounds(resized.Size), resized.Transform));
 
+        canvas.Invalidate(_target);
+        canvas.RefreshOverlay();
+    }
+
+    /// <summary>
+    /// Drags a control point — today only a callout's tail.
+    ///
+    /// <para>A <see cref="ReshapeAnnotation"/>, not a resize: the object's bounds and
+    /// transform do not move, only its own idea of its shape. That is also what makes
+    /// the whole drag one undo step, since reshapes absorb.</para>
+    /// </summary>
+    private void DragControlPoint(Point image)
+    {
+        if (_target is null || _startGeometry is null) return;
+
+        var inverse = _startTransform;
+        if (!inverse.HasInverse) return;
+        inverse.Invert();
+
+        if (_target.MoveControlPoint(_handle, inverse.Transform(image)) is not { } moved) return;
+
+        undo.Apply(new ReshapeAnnotation(_target, _startGeometry, moved));
         canvas.Invalidate(_target);
         canvas.RefreshOverlay();
     }

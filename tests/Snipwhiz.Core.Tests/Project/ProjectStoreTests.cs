@@ -191,6 +191,33 @@ public class ProjectStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A callout is a text annotation, so it can come back as one — with the words
+    /// and the size intact and the tail simply gone, which is the kind of loss that
+    /// looks like a rendering change rather than like a format bug.
+    /// </summary>
+    [Fact]
+    public void A_callout_round_trips_with_its_tail_and_not_as_plain_text()
+    {
+        var callout = new CalloutAnnotation
+        {
+            Text = "Check this",
+            FontSize = 22,
+            Tail = new Vector(-64, 90),
+            Transform = new Matrix(1, 0, 0, 1, 200, 140),
+        };
+
+        var path = Path_("callout.ssproj");
+        ProjectStore.Save(path, Scene(callout));
+
+        Assert.Contains("\"callout\"", File.ReadAllText(path));
+
+        var loaded = Assert.IsType<CalloutAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal("Check this", loaded.Text);
+        Assert.Equal(22, loaded.FontSize);
+        Assert.Equal(new Vector(-64, 90), loaded.Tail);
+    }
+
+    /// <summary>
     /// A step badge's number is its position among the steps, so the file must not
     /// carry one. A file with both has two answers, and the stored one wins on
     /// reopen — which is how a document that renumbers correctly all session comes

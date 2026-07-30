@@ -172,6 +172,12 @@ public static class ProjectStore
                 w.WriteNumber("dx", line.Delta.X);
                 w.WriteNumber("dy", line.Delta.Y);
                 break;
+            case CalloutAnnotation callout:
+                w.WriteString("text", callout.Text);
+                w.WriteNumber("fontSize", callout.FontSize);
+                w.WriteNumber("tailX", callout.Tail.X);
+                w.WriteNumber("tailY", callout.Tail.Y);
+                break;
             case TextAnnotation text:
                 w.WriteString("text", text.Text);
                 w.WriteNumber("fontSize", text.FontSize);
@@ -192,6 +198,9 @@ public static class ProjectStore
     public static string TagOf(Annotation a) => a switch
     {
         HighlightAnnotation => "highlight",
+        // Before the text arm: a callout is one, and carries a tail that text knows
+        // nothing about. Placed after, this does not compile.
+        CalloutAnnotation => "callout",
         TextAnnotation => "text",
         // Also before the rectangle arm, and for the same reason as arrow below.
         PixelateAnnotation => "pixelate",
@@ -249,7 +258,7 @@ public static class ProjectStore
         var z = e.GetProperty("z").GetInt32();
 
         if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"
-            or "pixelate" or "blur" or "spotlight" or "magnify" or "step"))
+            or "pixelate" or "blur" or "spotlight" or "magnify" or "step" or "callout"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -302,6 +311,15 @@ public static class ProjectStore
             "ellipse" => new EllipseAnnotation
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "callout" => new CalloutAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style,
+                Text = geometry.GetProperty("text").GetString() ?? "",
+                FontSize = geometry.GetProperty("fontSize").GetDouble(),
+                Tail = new Vector(
+                    geometry.GetProperty("tailX").GetDouble(),
+                    geometry.GetProperty("tailY").GetDouble()),
             },
             "text" => new TextAnnotation
             {

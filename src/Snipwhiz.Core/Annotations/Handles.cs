@@ -11,6 +11,12 @@ public enum HandleKind
     BottomRight, Bottom, BottomLeft,
     Left,
     Rotate,
+
+    /// <summary>
+    /// A callout's tail tip. The first handle that is neither a resizer nor the
+    /// rotate handle; see <see cref="Annotation.ControlPoints"/>.
+    /// </summary>
+    Tail,
 }
 
 /// <summary>
@@ -57,7 +63,10 @@ public static class Handles
             HandleKind.BottomLeft => b.BottomLeft,
             HandleKind.Left => new Point(b.X, b.Y + b.Height / 2),
             HandleKind.Rotate => new Point(b.X + b.Width / 2, b.Y - rotateGap),
-            _ => new Point(b.X + b.Width / 2, b.Y + b.Height / 2),
+            // Anything else is a control point the object owns and this class knows
+            // nothing about. The base implementation returns the centre, which is
+            // what None used to fall through to.
+            _ => annotation.ControlPoint(kind),
         };
     }
 

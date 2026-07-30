@@ -93,9 +93,16 @@ internal static class TextSeamVerification
             // where a non-integer scale is applied to whatever the layout produced.
             // Text that agrees at 100% and drifts at 150% is the usual shape of this
             // bug, so one DPI alone would not settle it.
-            foreach (var dpi in new[] { 96.0, 144.0 })
+            // Both subjects, because a callout reuses this overlay and inherits the
+            // whole seam. "It should be identical, it is the same class" is an
+            // argument; two numbers are evidence, and if a callout ever grows its own
+            // text placement this is what would notice.
+            foreach (var callout in new[] { false, true })
             {
-                lines.Add(Report(dpi, Compare(host, dpi)));
+                foreach (var dpi in new[] { 96.0, 144.0 })
+                {
+                    lines.Add(Report(dpi, Compare(host, dpi, callout), callout));
+                }
             }
 
             File.WriteAllText(ResultPath, Header() + string.Join("\n", lines));
@@ -107,20 +114,21 @@ internal static class TextSeamVerification
         window.Show();
     }
 
-    private static Seam Compare(Canvas host, double dpi)
+    private static Seam Compare(Canvas host, double dpi, bool callout)
     {
         // Deliberately awkward: mixed case for ascenders and descenders, digits,
         // punctuation that sits on the baseline, and a second line, because a
         // line-height disagreement only shows up once there are two of them.
-        var annotation = new TextAnnotation
-        {
-            Text = "Handoff 2026-07: gjpqy — check the seam\nSecond line, for line height",
-            FontSize = 26,
-            Transform = new Matrix(1, 0, 0, 1, Width / 2.0, Height / 2.0),
-            // No plate. Both images then contain glyphs and nothing else, so the ink
-            // bounding box is the text's and not a rounded rectangle's.
-            Style = TextAnnotation.DefaultStyle with { Fill = null, Stroke = Colors.White },
-        };
+        TextAnnotation annotation = callout ? new CalloutAnnotation() : new TextAnnotation();
+
+        annotation.Text = "Handoff 2026-07: gjpqy — check the seam\nSecond line, for line height";
+        annotation.FontSize = 26;
+        annotation.Transform = new Matrix(1, 0, 0, 1, Width / 2.0, Height / 2.0);
+        // No plate. Both images then contain glyphs and nothing else, so the ink
+        // bounding box is the text's and not a rounded rectangle's — and for a
+        // callout it also means no bubble and no tail, so what is compared is purely
+        // where the words land, which is the claim being tested.
+        annotation.Style = TextAnnotation.DefaultStyle with { Fill = null, Stroke = Colors.White };
 
         var drawn = RenderAnnotation(annotation, dpi);
 
@@ -261,7 +269,7 @@ internal static class TextSeamVerification
     /// </summary>
     private const double MaxDifferingShare = 0.02;
 
-    private static string Report(double dpi, Seam seam)
+    private static string Report(double dpi, Seam seam, bool callout)
     {
         var offset = Math.Max(Math.Abs(seam.OffsetX), Math.Abs(seam.OffsetY));
         var share = seam.InkPixels == 0 ? 1 : (double)seam.DifferingPixels / seam.InkPixels;
@@ -275,7 +283,7 @@ internal static class TextSeamVerification
             ? "WITHIN TOLERANCE"
             : "OUT OF TOLERANCE";
 
-        return $"--- {dpi / 96.0 * 100:F0}% DPI ---\n" +
+        return $"--- {(callout ? "callout" : "text")} at {dpi / 96.0 * 100:F0}% DPI ---\n" +
                $"inkOffsetX={seam.OffsetX:F3}\n" +
                $"inkOffsetY={seam.OffsetY:F3}\n" +
                $"inkWidthDelta={seam.WidthDelta:F3}\n" +

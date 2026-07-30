@@ -31,6 +31,7 @@ public class ToolRailTests
         { Key.A, "ArrowToolButton" },
         { Key.H, "HighlightToolButton" },
         { Key.T, "TextToolButton" },
+        { Key.O, "CalloutToolButton" },
         { Key.N, "StepToolButton" },
         { Key.M, "MagnifyToolButton" },
         { Key.S, "SpotlightToolButton" },

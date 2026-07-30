@@ -142,6 +142,37 @@ public abstract class Annotation
     public abstract GeometryState GeometryForBounds(Size size);
 
     /// <summary>
+    /// Grab points this object has beyond the eight resizers and the rotate handle.
+    ///
+    /// <para>Empty for everything with a box and a rotation, which was every
+    /// annotation until the callout tail. The tail is neither: dragging it does not
+    /// resize the bubble and does not turn it, it re-aims the thing the bubble is
+    /// pointing at.</para>
+    ///
+    /// <para>Three small members rather than teaching <see cref="Handles"/> about
+    /// callouts, for the same reason <see cref="GeometryForBounds"/> exists: the
+    /// selection tool would otherwise have to know which types have what, and B1
+    /// already showed what that costs.</para>
+    /// </summary>
+    public virtual IReadOnlyList<HandleKind> ControlPoints => [];
+
+    /// <summary>
+    /// Where one of <see cref="ControlPoints"/> sits, in this object's own space.
+    ///
+    /// <para>The origin by default, which is the centre — <see cref="LocalBounds"/>
+    /// is centred on the origin for every annotation, so this is exactly what
+    /// <see cref="Handles.LocalPosition"/> already fell through to for a kind it did
+    /// not recognise.</para>
+    /// </summary>
+    public virtual Point ControlPoint(HandleKind kind) => new(0, 0);
+
+    /// <summary>
+    /// The geometry this object would have with a control point dragged to a local
+    /// point, or null if it has no such point.
+    /// </summary>
+    public virtual GeometryState? MoveControlPoint(HandleKind kind, Point local) => null;
+
+    /// <summary>
     /// Shapes this object to span two image-space points, unrotated.
     ///
     /// <para>What a create-by-drag gesture means, per shape: a box for a rectangle,

@@ -215,6 +215,21 @@ internal static class WysiwygVerification
         magnify.SourceCentre = new Point(140, 300);
         document.Annotations.Add(magnify);
 
+        // A callout, for the united bubble-and-tail geometry. Its plate is
+        // translucent by default, so a grouped pair of fills instead of a union would
+        // show here as a darker wedge and this diff would only catch it if both
+        // paths ever disagreed — which is why CalloutTests checks the seam in pixels
+        // as well.
+        var callout = new CalloutAnnotation
+        {
+            ZIndex = 14,
+            Text = "the seam",
+            FontSize = 20,
+            Tail = new Vector(-52, 64),
+            Transform = new Matrix(1, 0, 0, 1, 380, 180),
+        };
+        document.Annotations.Add(callout);
+
         // Three badges, so the gate covers a two-digit-capable glyph draw as well as
         // the circle. Numbering happens in InPaintOrder, which both render paths go
         // through — if it ever did not, these would draw different digits in the two

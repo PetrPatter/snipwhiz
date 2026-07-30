@@ -57,5 +57,12 @@ public sealed record MagnifyGeometryState(Size Size, double Zoom, Point SourceCe
 /// </summary>
 public sealed record StepGeometryState(double Diameter) : GeometryState;
 
+/// <summary>
+/// Text plus where it points. <paramref name="Tail"/> is relative to the bubble, so
+/// moving a callout carries its tail — unlike a magnifier's subject, which is
+/// absolute because it belongs to the picture rather than to the object.
+/// </summary>
+public sealed record CalloutGeometryState(string Text, double FontSize, Vector Tail) : GeometryState;
+
 /// <summary>Carried by an annotation this build cannot interpret, and never edited.</summary>
 public sealed record OpaqueGeometryState : GeometryState;

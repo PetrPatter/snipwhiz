@@ -58,6 +58,7 @@ public partial class EditorView : UserControl
         ArrowToolButton.Click += (_, _) => UseShape(ArrowToolButton, () => new ArrowAnnotation());
         HighlightToolButton.Click += (_, _) => UseShape(HighlightToolButton, () => new HighlightAnnotation());
         TextToolButton.Click += (_, _) => UseShape(TextToolButton, () => new TextAnnotation());
+        CalloutToolButton.Click += (_, _) => UseShape(CalloutToolButton, () => new CalloutAnnotation());
         StepToolButton.Click += (_, _) => UseShape(StepToolButton, () => new StepAnnotation());
         MagnifyToolButton.Click += (_, _) => UseShape(MagnifyToolButton, () => new MagnifyAnnotation());
         SpotlightToolButton.Click += (_, _) => UseShape(SpotlightToolButton, () => new SpotlightAnnotation());
@@ -567,6 +568,7 @@ public partial class EditorView : UserControl
             case Key.A when !control: UseShape(ArrowToolButton, () => new ArrowAnnotation()); break;
             case Key.H when !control: UseShape(HighlightToolButton, () => new HighlightAnnotation()); break;
             case Key.T when !control: UseShape(TextToolButton, () => new TextAnnotation()); break;
+            case Key.O when !control: UseShape(CalloutToolButton, () => new CalloutAnnotation()); break;
             case Key.N when !control: UseShape(StepToolButton, () => new StepAnnotation()); break;
             case Key.M when !control: UseShape(MagnifyToolButton, () => new MagnifyAnnotation()); break;
             case Key.S when !control: UseShape(SpotlightToolButton, () => new SpotlightAnnotation()); break;
