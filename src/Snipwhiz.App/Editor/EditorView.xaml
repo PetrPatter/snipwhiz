@@ -73,6 +73,24 @@
                 <ToggleButton x:Name="TextToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Text  (T)"/>
+                <ToggleButton x:Name="CalloutToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE8BD;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Callout  (O)"/>
+                <ToggleButton x:Name="StepToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE8FD;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Step number  (N)"/>
+                <ToggleButton x:Name="MagnifyToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE71E;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Magnify  (M)"/>
+                <ToggleButton x:Name="SpotlightToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE706;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Spotlight  (S)"/>
+                <ToggleButton x:Name="BlurToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE890;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Blur  (B)"/>
+                <ToggleButton x:Name="PixelateToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE71F;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Pixelate  (P)"/>
                 <ToggleButton x:Name="CropToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE7A8;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Crop  (C)"/>

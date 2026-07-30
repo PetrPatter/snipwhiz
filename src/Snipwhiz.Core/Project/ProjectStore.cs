@@ -131,6 +131,33 @@ public static class ProjectStore
         w.WriteStartObject("geometry");
         switch (a)
         {
+            // Before the rectangle arm: a pixelate is one, and carries a block size
+            // a rectangle knows nothing about. Placed after, this does not compile.
+            case PixelateAnnotation p:
+                w.WriteNumber("width", p.Size.Width);
+                w.WriteNumber("height", p.Size.Height);
+                w.WriteNumber("blockSize", p.BlockSize);
+                break;
+            // Diameter only. The number it reads is its position among the steps and
+            // is deliberately not written: a file that carried both would have two
+            // answers, and the stored one would win on reopen.
+            case StepAnnotation step:
+                w.WriteNumber("diameter", step.Diameter);
+                break;
+            case MagnifyAnnotation magnify:
+                w.WriteNumber("width", magnify.Size.Width);
+                w.WriteNumber("height", magnify.Size.Height);
+                w.WriteNumber("zoom", magnify.Zoom);
+                // Absolute, so a magnifier dragged away from its subject reopens
+                // still pointing at the subject rather than at itself.
+                w.WriteNumber("sourceX", magnify.SourceCentre.X);
+                w.WriteNumber("sourceY", magnify.SourceCentre.Y);
+                break;
+            case BlurAnnotation b:
+                w.WriteNumber("width", b.Size.Width);
+                w.WriteNumber("height", b.Size.Height);
+                w.WriteNumber("radius", b.Radius);
+                break;
             // Covers HighlightAnnotation too — it is a rectangle, same geometry.
             case RectangleAnnotation r:
                 w.WriteNumber("width", r.Size.Width);
@@ -144,6 +171,12 @@ public static class ProjectStore
             case LineAnnotation line:
                 w.WriteNumber("dx", line.Delta.X);
                 w.WriteNumber("dy", line.Delta.Y);
+                break;
+            case CalloutAnnotation callout:
+                w.WriteString("text", callout.Text);
+                w.WriteNumber("fontSize", callout.FontSize);
+                w.WriteNumber("tailX", callout.Tail.X);
+                w.WriteNumber("tailY", callout.Tail.Y);
                 break;
             case TextAnnotation text:
                 w.WriteString("text", text.Text);
@@ -165,7 +198,20 @@ public static class ProjectStore
     public static string TagOf(Annotation a) => a switch
     {
         HighlightAnnotation => "highlight",
+        // Before the text arm: a callout is one, and carries a tail that text knows
+        // nothing about. Placed after, this does not compile.
+        CalloutAnnotation => "callout",
         TextAnnotation => "text",
+        // Also before the rectangle arm, and for the same reason as arrow below.
+        PixelateAnnotation => "pixelate",
+        BlurAnnotation => "blur",
+        // Its geometry really is a rectangle's — the dim strength lives in the
+        // style's opacity — so it needs no arm in the geometry switch below. Only
+        // the tag has to come first, or a spotlight reopens as an opaque black box
+        // over the whole picture.
+        SpotlightAnnotation => "spotlight",
+        MagnifyAnnotation => "magnify",
+        StepAnnotation => "step",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
         // Before the line arm, not after: an arrow is a LineAnnotation and the first
@@ -211,7 +257,8 @@ public static class ProjectStore
         var id = e.GetProperty("id").GetGuid();
         var z = e.GetProperty("z").GetInt32();
 
-        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"))
+        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"
+            or "pixelate" or "blur" or "spotlight" or "magnify" or "step" or "callout"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -232,9 +279,47 @@ public static class ProjectStore
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
             },
+            "pixelate" => new PixelateAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+                BlockSize = geometry.GetProperty("blockSize").GetDouble(),
+            },
+            // Style from the file, not from DefaultStyle: a spotlight the user
+            // dimmed further must reopen at the strength they chose.
+            "spotlight" => new SpotlightAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "step" => new StepAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style,
+                Diameter = geometry.GetProperty("diameter").GetDouble(),
+            },
+            "magnify" => new MagnifyAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+                Zoom = geometry.GetProperty("zoom").GetDouble(),
+                SourceCentre = new Point(
+                    geometry.GetProperty("sourceX").GetDouble(),
+                    geometry.GetProperty("sourceY").GetDouble()),
+            },
+            "blur" => new BlurAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+                Radius = geometry.GetProperty("radius").GetDouble(),
+            },
             "ellipse" => new EllipseAnnotation
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "callout" => new CalloutAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style,
+                Text = geometry.GetProperty("text").GetString() ?? "",
+                FontSize = geometry.GetProperty("fontSize").GetDouble(),
+                Tail = new Vector(
+                    geometry.GetProperty("tailX").GetDouble(),
+                    geometry.GetProperty("tailY").GetDouble()),
             },
             "text" => new TextAnnotation
             {

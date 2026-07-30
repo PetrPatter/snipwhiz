@@ -145,6 +145,152 @@ public class ProjectStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A pixelate is a rectangle plus a block size, so it can fail in both of the
+    /// ways a subclass can: coming back as its base type, and coming back as itself
+    /// with the extra number lost. A redaction reopened at the default block size is
+    /// a redaction that has changed how much it hides.
+    /// </summary>
+    [Fact]
+    public void A_pixelate_round_trips_with_its_block_size()
+    {
+        var pixelate = new PixelateAnnotation
+        {
+            Size = new Size(180, 60),
+            BlockSize = 21,
+            Transform = new Matrix(1, 0, 0, 1, 250, 150),
+        };
+
+        var path = Path_("pixelate.ssproj");
+        ProjectStore.Save(path, Scene(pixelate));
+
+        Assert.Contains("\"pixelate\"", File.ReadAllText(path));
+
+        var loaded = Assert.IsType<PixelateAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Size(180, 60), loaded.Size);
+        Assert.Equal(21, loaded.BlockSize);
+    }
+
+    [Fact]
+    public void A_blur_round_trips_with_its_radius()
+    {
+        var blur = new BlurAnnotation
+        {
+            Size = new Size(200, 40),
+            Radius = 19,
+            Transform = new Matrix(1, 0, 0, 1, 120, 90),
+        };
+
+        var path = Path_("blur.ssproj");
+        ProjectStore.Save(path, Scene(blur));
+
+        Assert.Contains("\"blur\"", File.ReadAllText(path));
+
+        var loaded = Assert.IsType<BlurAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Size(200, 40), loaded.Size);
+        Assert.Equal(19, loaded.Radius);
+    }
+
+    /// <summary>
+    /// A callout is a text annotation, so it can come back as one — with the words
+    /// and the size intact and the tail simply gone, which is the kind of loss that
+    /// looks like a rendering change rather than like a format bug.
+    /// </summary>
+    [Fact]
+    public void A_callout_round_trips_with_its_tail_and_not_as_plain_text()
+    {
+        var callout = new CalloutAnnotation
+        {
+            Text = "Check this",
+            FontSize = 22,
+            Tail = new Vector(-64, 90),
+            Transform = new Matrix(1, 0, 0, 1, 200, 140),
+        };
+
+        var path = Path_("callout.ssproj");
+        ProjectStore.Save(path, Scene(callout));
+
+        Assert.Contains("\"callout\"", File.ReadAllText(path));
+
+        var loaded = Assert.IsType<CalloutAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal("Check this", loaded.Text);
+        Assert.Equal(22, loaded.FontSize);
+        Assert.Equal(new Vector(-64, 90), loaded.Tail);
+    }
+
+    /// <summary>
+    /// A step badge's number is its position among the steps, so the file must not
+    /// carry one. A file with both has two answers, and the stored one wins on
+    /// reopen — which is how a document that renumbers correctly all session comes
+    /// back tomorrow reading 1, 3, 4, 5.
+    /// </summary>
+    [Fact]
+    public void A_step_badge_round_trips_without_storing_its_number()
+    {
+        var first = new StepAnnotation { Diameter = 44 };
+        var second = new StepAnnotation { Diameter = 44 };
+        var third = new StepAnnotation { Diameter = 44 };
+
+        var path = Path_("steps.ssproj");
+        var document = Scene(first, second, third);
+        document.NumberSteps();
+        ProjectStore.Save(path, document);
+
+        Assert.DoesNotContain("number", File.ReadAllText(path));
+
+        var reopened = ProjectStore.Load(path);
+        var loaded = reopened.Annotations.OfType<StepAnnotation>().ToList();
+        reopened.NumberSteps();
+
+        Assert.Equal([1, 2, 3], loaded.Select(s => s.Number));
+        Assert.Equal(44, loaded[0].Diameter);
+    }
+
+    /// <summary>
+    /// The source centre is absolute, so a magnifier dragged away from its subject
+    /// must reopen still pointing at the subject. Stored relative to the lens it
+    /// would reopen pointing at itself, which renders as a bordered copy of whatever
+    /// it happens to be sitting on.
+    /// </summary>
+    [Fact]
+    public void A_magnifier_round_trips_still_pointing_at_its_subject()
+    {
+        var magnify = new MagnifyAnnotation
+        {
+            Size = new Size(120, 90),
+            Zoom = 3,
+            SourceCentre = new Point(410, 275),
+            Transform = new Matrix(1, 0, 0, 1, 80, 60),
+        };
+
+        var path = Path_("magnify.ssproj");
+        ProjectStore.Save(path, Scene(magnify));
+
+        var loaded = Assert.IsType<MagnifyAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Point(410, 275), loaded.SourceCentre);
+        Assert.Equal(3, loaded.Zoom);
+        Assert.Equal(new Size(120, 90), loaded.Size);
+    }
+
+    /// <summary>
+    /// A spotlight's geometry really is a rectangle's, so the only thing standing
+    /// between it and reopening as an opaque black box over the whole picture is its
+    /// type tag.
+    /// </summary>
+    [Fact]
+    public void A_spotlight_round_trips_as_a_spotlight_and_not_as_a_rectangle()
+    {
+        var spotlight = new SpotlightAnnotation { Size = new Size(160, 120) };
+        spotlight.SizeControl = 75;
+
+        var path = Path_("spotlight.ssproj");
+        ProjectStore.Save(path, Scene(spotlight));
+
+        var loaded = Assert.IsType<SpotlightAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Size(160, 120), loaded.Size);
+        Assert.Equal(75, loaded.SizeControl);
+    }
+
+    /// <summary>
     /// The whole reason <see cref="HighlightAnnotation"/> exists as a type: it draws
     /// exactly like a rectangle, so nothing else in the suite would notice it coming
     /// back as one — and a highlight saved as a rectangle can never be recovered.

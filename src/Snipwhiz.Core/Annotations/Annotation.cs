@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -85,6 +86,15 @@ public abstract class Annotation
         set => Style = Style with { StrokeWidth = value };
     }
 
+    /// <summary>
+    /// Whether placing one of these leaves the tool active.
+    ///
+    /// <para>False for everything that is drawn once and then adjusted; true for step
+    /// numbers, where the point is to place several in a row. Asked of the type for
+    /// the same reason as everything else here.</para>
+    /// </summary>
+    public virtual bool PlacesRepeatedly => false;
+
     public virtual (double Min, double Max) SizeControlRange => (0, 24);
 
     public virtual string SizeControlLabel => "Stroke width";
@@ -132,6 +142,65 @@ public abstract class Annotation
     public abstract GeometryState GeometryForBounds(Size size);
 
     /// <summary>
+    /// Grab points this object has beyond the eight resizers and the rotate handle.
+    ///
+    /// <para>Empty for everything with a box and a rotation, which was every
+    /// annotation until the callout tail. The tail is neither: dragging it does not
+    /// resize the bubble and does not turn it, it re-aims the thing the bubble is
+    /// pointing at.</para>
+    ///
+    /// <para>Three small members rather than teaching <see cref="Handles"/> about
+    /// callouts, for the same reason <see cref="GeometryForBounds"/> exists: the
+    /// selection tool would otherwise have to know which types have what, and B1
+    /// already showed what that costs.</para>
+    /// </summary>
+    public virtual IReadOnlyList<HandleKind> ControlPoints => [];
+
+    /// <summary>
+    /// Where one of <see cref="ControlPoints"/> sits, in this object's own space.
+    ///
+    /// <para>The origin by default, which is the centre — <see cref="LocalBounds"/>
+    /// is centred on the origin for every annotation, so this is exactly what
+    /// <see cref="Handles.LocalPosition"/> already fell through to for a kind it did
+    /// not recognise.</para>
+    /// </summary>
+    public virtual Point ControlPoint(HandleKind kind) => new(0, 0);
+
+    /// <summary>
+    /// The geometry this object would have with a control point dragged to a local
+    /// point, or null if it has no such point.
+    /// </summary>
+    public virtual GeometryState? MoveControlPoint(HandleKind kind, Point local) => null;
+
+    /// <summary>
+    /// Fixes up anything stored in local coordinates after a resize moved this
+    /// object's own frame out from under it.
+    /// </summary>
+    ///
+    /// <param name="start">
+    /// The geometry this object had when the gesture began. <b>The correction is
+    /// measured from here, never from the current value.</b> A resize applies on
+    /// every mouse-move and <paramref name="localShift"/> is cumulative from the
+    /// start of the drag, so subtracting it from a value that already had the
+    /// previous frame's shift taken out compounds it — and the tail accelerates away
+    /// across the picture. That is exactly what happened.
+    /// </param>
+    ///
+    /// <param name="localShift">Where the new origin sits in the gesture's starting frame.</param>
+    ///
+    /// <remarks>
+    /// Identity for everything whose geometry is a size, which is almost everything:
+    /// a rectangle's width does not care where its centre went. It matters for a
+    /// callout's tail, which is a point rather than an extent — dragging a corner
+    /// anchors the opposite one and slides the origin, and a tail that rode along
+    /// stopped pointing at what it was pointing at. Found by hand after the tests
+    /// checked that the tail <i>survived</i> a resize without checking that it still
+    /// aimed anywhere in particular.
+    /// </remarks>
+    public virtual GeometryState Rebased(GeometryState state, GeometryState start, Vector localShift) =>
+        state;
+
+    /// <summary>
     /// Shapes this object to span two image-space points, unrotated.
     ///
     /// <para>What a create-by-drag gesture means, per shape: a box for a rectangle,
@@ -163,7 +232,24 @@ public abstract class Annotation
         return HitTestLocal(inverse.Transform(imagePoint), tolerance);
     }
 
-    public abstract void Render(DrawingContext dc);
+    /// <summary>
+    /// Draws this object.
+    ///
+    /// <para><paramref name="source"/> is the <b>original capture</b>, and every
+    /// annotation is handed it whether or not it wants it. Most do not: a rectangle
+    /// is a rectangle. Blur, pixelate and magnify are not pure vector objects — they
+    /// have to look at pixels — and the alternative to one signature that can express
+    /// that is a second render entry point for the ones that sample, which is the
+    /// exact shape of the thing §1 and the WYSIWYG gate exist to prevent.</para>
+    ///
+    /// <para><b>The original, not the composite</b> (§4.9). Sampling what is beneath
+    /// would make paint order load-bearing, force a re-render of every pixel tool
+    /// whenever anything below it changed, and cycle when two blurs overlap. The
+    /// documented consequence is that an arrow underneath a blur is not blurred —
+    /// correct for a redaction tool, because the thing being hidden is in the
+    /// capture.</para>
+    /// </summary>
+    public abstract void Render(DrawingContext dc, BitmapSource source);
 
     /// <summary>Frozen, so one instance is safe on the canvas thread and the flattener's.</summary>
     protected Brush? FillBrush()

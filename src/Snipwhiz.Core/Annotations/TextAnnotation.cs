@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -12,7 +13,10 @@ namespace Snipwhiz.Core.Annotations;
 /// That is what makes the plate fit the words instead of the words being clipped by
 /// a plate someone dragged.</para>
 /// </summary>
-public sealed class TextAnnotation : Annotation
+/// <para>Not sealed: <see cref="CalloutAnnotation"/> is this with a tail, and reuses
+/// the measuring, the editing overlay and the metrics seam §4.8 was so careful
+/// about.</para>
+public class TextAnnotation : Annotation
 {
     public const string FontFamilyName = "Segoe UI";
 
@@ -143,7 +147,7 @@ public sealed class TextAnnotation : Annotation
         return hit.Contains(local);
     }
 
-    public override void Render(DrawingContext dc)
+    public override void Render(DrawingContext dc, BitmapSource source)
     {
         var bounds = LocalBounds;
 
@@ -154,7 +158,7 @@ public sealed class TextAnnotation : Annotation
         // silently grow it.
         if (FillBrush() is { } plate)
         {
-            dc.DrawRoundedRectangle(plate, null, bounds, CornerRadius, CornerRadius);
+            dc.DrawGeometry(plate, null, Plate(bounds));
         }
 
         if (!IsBeingEdited)
@@ -165,6 +169,23 @@ public sealed class TextAnnotation : Annotation
         }
 
         dc.Pop();
+    }
+
+    /// <summary>
+    /// The shape drawn behind the words.
+    ///
+    /// <para>Virtual so a callout can hand back its bubble and tail as one geometry
+    /// without a second <see cref="Render"/>. Everything else about drawing text —
+    /// the plate brush, the no-pen rule, the skip while editing — stays in one
+    /// place, which is the point.</para>
+    /// </summary>
+    // Qualified: Snipwhiz.Core.Geometry is a namespace in this assembly and wins
+    // over the WPF type, the same collision FlowDirection has with WinForms.
+    protected virtual System.Windows.Media.Geometry Plate(Rect bounds)
+    {
+        var plate = new RectangleGeometry(bounds, CornerRadius, CornerRadius);
+        plate.Freeze();
+        return plate;
     }
 
     /// <summary>

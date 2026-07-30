@@ -35,6 +35,8 @@ internal static class SelectionOverlay
 
     private static readonly Brush CropDim = Frozen(Color.FromArgb(0xA8, 0x0E, 0x0D, 0x0C));
 
+    private static readonly Brush ControlFill = Frozen(Color.FromRgb(0xE8, 0x83, 0x3A));
+
     public static void Render(
         DrawingContext dc, CanvasHost canvas, IReadOnlyList<Annotation> selection, Rect? marquee)
     {
@@ -117,6 +119,14 @@ internal static class SelectionOverlay
             dc.DrawRectangle(HandleFill, HandleEdge, new Rect(
                 centre.X - HandleSize / 2, centre.Y - HandleSize / 2, HandleSize, HandleSize));
         }
+
+        // Round and accent-filled, so a control point does not read as a ninth
+        // resize handle. Dragging it does something else entirely.
+        foreach (var kind in annotation.ControlPoints)
+        {
+            var centre = Position(canvas, annotation, kind);
+            dc.DrawEllipse(ControlFill, HandleEdge, centre, HandleSize / 2, HandleSize / 2);
+        }
     }
 
     /// <summary>
@@ -128,6 +138,15 @@ internal static class SelectionOverlay
     /// </summary>
     public static HandleKind HandleAt(CanvasHost canvas, Annotation annotation, Point element)
     {
+        // Control points first. A callout's tail can be dragged anywhere, including
+        // on top of a resize handle, and the one that does the unusual thing should
+        // win — a resizer that has been covered can still be reached from the other
+        // side of the object.
+        foreach (var kind in annotation.ControlPoints)
+        {
+            if (Near(Position(canvas, annotation, kind), element)) return kind;
+        }
+
         if (Near(Position(canvas, annotation, HandleKind.Rotate), element)) return HandleKind.Rotate;
 
         foreach (var kind in Handles.Resizers)

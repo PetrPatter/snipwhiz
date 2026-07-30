@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -54,7 +55,7 @@ public sealed class ArrowAnnotation : LineAnnotation
     /// stroke width across the point, which reads as blunt — invisible at 2px and
     /// obvious at 12. The head's apex is exactly the point the drag ended on.</para>
     /// </summary>
-    public override void Render(DrawingContext dc)
+    public override void Render(DrawingContext dc, BitmapSource source)
     {
         var pen = StrokePen();
         if (pen is null) return;

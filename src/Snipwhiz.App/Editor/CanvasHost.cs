@@ -238,8 +238,10 @@ public sealed class CanvasHost : FrameworkElement
 
     private void Draw(Annotation annotation, DrawingVisual visual)
     {
+        if (_source is null) return;
+
         using var dc = visual.RenderOpen();
-        annotation.Render(dc);
+        annotation.Render(dc, _source);
         VisualRenderCount++;
     }
 

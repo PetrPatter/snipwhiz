@@ -32,5 +32,37 @@ public sealed record LineGeometryState(Vector Delta) : GeometryState;
 /// </summary>
 public sealed record TextGeometryState(string Text, double FontSize) : GeometryState;
 
+/// <summary>
+/// A pixelate is a box plus a block size, and the block size is geometry rather
+/// than style for the same reason text's font size is: it changes how big the thing
+/// is, and undo has to put it back.
+/// </summary>
+public sealed record PixelateGeometryState(Size Size, double BlockSize) : GeometryState;
+
+/// <summary>The same shape as a pixelate's, for the same reason.</summary>
+public sealed record BlurGeometryState(Size Size, double Radius) : GeometryState;
+
+/// <summary>
+/// A magnifier is two rectangles: the lens, which is <paramref name="Size"/> and the
+/// transform every annotation has, and the subject, which is
+/// <paramref name="SourceCentre"/> in absolute image space. Both are geometry
+/// because undo has to put both back.
+/// </summary>
+public sealed record MagnifyGeometryState(Size Size, double Zoom, Point SourceCentre) : GeometryState;
+
+/// <summary>
+/// A step badge is one number wide — its diameter. What it <i>reads</i> is not here
+/// and is not anywhere: the number is the object's position among the steps, so
+/// there is nothing about it for undo to restore.
+/// </summary>
+public sealed record StepGeometryState(double Diameter) : GeometryState;
+
+/// <summary>
+/// Text plus where it points. <paramref name="Tail"/> is relative to the bubble, so
+/// moving a callout carries its tail — unlike a magnifier's subject, which is
+/// absolute because it belongs to the picture rather than to the object.
+/// </summary>
+public sealed record CalloutGeometryState(string Text, double FontSize, Vector Tail) : GeometryState;
+
 /// <summary>Carried by an annotation this build cannot interpret, and never edited.</summary>
 public sealed record OpaqueGeometryState : GeometryState;

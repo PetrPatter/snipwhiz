@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -65,7 +66,7 @@ public class RectangleAnnotation : Annotation
     public override void RestoreGeometry(GeometryState state) =>
         Size = ((RectangleGeometryState)state).Size;
 
-    public override void Render(DrawingContext dc)
+    public override void Render(DrawingContext dc, BitmapSource source)
     {
         dc.PushTransform(new MatrixTransform(Transform));
         dc.DrawRectangle(FillBrush(), StrokePen(), LocalBounds);

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -80,7 +81,7 @@ public class LineAnnotation : Annotation
         return (local - nearest).Length <= slack;
     }
 
-    public override void Render(DrawingContext dc)
+    public override void Render(DrawingContext dc, BitmapSource source)
     {
         var pen = StrokePen();
         if (pen is null) return;

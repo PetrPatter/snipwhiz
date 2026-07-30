@@ -182,6 +182,70 @@ internal static class WysiwygVerification
         arrow.Fit(new Point(90, 250), new Point(330, 140));
         document.Annotations.Add(arrow);
 
+        // A pixelate, rotated, straddling the crop edge and overlapping the objects
+        // above it. This is the first annotation that samples the capture, and the
+        // one place a second render path could reappear after phase B closed all the
+        // others: if the canvas ever sampled what is on screen while the flattener
+        // sampled the file, everything under this rectangle would differ and nothing
+        // else in the suite would say so.
+        var pixelate = new PixelateAnnotation { ZIndex = 7, BlockSize = 9 };
+        pixelate.Fit(new Point(360, 210), new Point(500, 300));
+        var turned = pixelate.Transform;
+        turned.RotateAt(-12, turned.OffsetX, turned.OffsetY);
+        pixelate.Transform = turned;
+        document.Annotations.Add(pixelate);
+
+        // A blur over the busiest part of the scene. It caches its result, which is
+        // the one thing here that could make the canvas and the export disagree
+        // without either of them being wrong on its own — two renders, two caches,
+        // and only a diff to say whether they hold the same pixels.
+        var blur = new BlurAnnotation { ZIndex = 8, Radius = 14 };
+        blur.Fit(new Point(70, 60), new Point(210, 150));
+        document.Annotations.Add(blur);
+
+        // A spotlight over everything, at a deliberately mild dim. It is the only
+        // annotation that paints most of the picture, so it covers whether a
+        // full-canvas geometry lands identically in both paths — and a strong dim
+        // here would flatten the channel deltas the control below depends on.
+        // A magnifier aimed somewhere other than where it is drawn — the only object
+        // here that reads the capture at one place and paints it at another, which
+        // is a distinct way for two render paths to disagree.
+        var magnify = new MagnifyAnnotation { ZIndex = 9, Zoom = 3 };
+        magnify.Fit(new Point(300, 40), new Point(420, 130));
+        magnify.SourceCentre = new Point(140, 300);
+        document.Annotations.Add(magnify);
+
+        // A callout, for the united bubble-and-tail geometry. Its plate is
+        // translucent by default, so a grouped pair of fills instead of a union would
+        // show here as a darker wedge and this diff would only catch it if both
+        // paths ever disagreed — which is why CalloutTests checks the seam in pixels
+        // as well.
+        var callout = new CalloutAnnotation
+        {
+            ZIndex = 14,
+            Text = "the seam",
+            FontSize = 20,
+            Tail = new Vector(-52, 64),
+            Transform = new Matrix(1, 0, 0, 1, 380, 180),
+        };
+        document.Annotations.Add(callout);
+
+        // Three badges, so the gate covers a two-digit-capable glyph draw as well as
+        // the circle. Numbering happens in InPaintOrder, which both render paths go
+        // through — if it ever did not, these would draw different digits in the two
+        // images and this diff is what would say so.
+        for (var i = 0; i < 3; i++)
+        {
+            var step = new StepAnnotation { ZIndex = 11 + i, Diameter = 30 };
+            step.Fit(new Point(0, 0), new Point(80 + i * 46, 330));
+            document.Annotations.Add(step);
+        }
+
+        var spotlight = new SpotlightAnnotation { ZIndex = 10 };
+        spotlight.Fit(new Point(120, 100), new Point(400, 260));
+        spotlight.SizeControl = 30;
+        document.Annotations.Add(spotlight);
+
         return document;
     }
 
