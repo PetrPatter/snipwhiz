@@ -52,13 +52,25 @@ can be checked privately has been.
 
 **Files:** `Directory.Build.props`, `src/Snipwhiz.App/Snipwhiz.App.csproj`.
 
-- [ ] **Step 1: `Directory.Build.props` holds the version**, and every project
+- [x] **Step 1: `Directory.Build.props` holds the version**, and every project
   inherits it. Four places carry a version — assembly, installer, feed, About text
   — and four places to set it is three places to forget.
-- [ ] **Step 2: A self-contained publish** for `win-x64`. Not single-file: it buys
+- [x] **Step 2: A self-contained publish** for `win-x64`. Not single-file: it buys
   nothing once an installer exists, and it slows startup.
-- [ ] **Step 3: About text reads its own assembly**, never a constant, so it cannot
-  claim a version the binary is not.
+- [x] **Step 3: About text reads its own assembly**, never a constant, so it cannot
+  claim a version the binary is not. It strips the `+commit` suffix the SDK stamps
+  onto the informational version, which is real rather than hypothetical.
+
+**Done.** Gate passed: the publish ran with every `dotnet` entry stripped from
+`PATH` and `DOTNET_ROOT` unset, against `SNIPWHIZ_ROOT` so it could not reach the
+real library — checked by comparing write times rather than assumed.
+
+**The negative control found a hole and it is now closed.** A stray `<Version>` in
+any `.csproj` silently beats `Directory.Build.props` — props said 1.0.0, the csproj
+said 0.0.1, the stamped assembly said 0.0.1, no MSBuild warning. The single source
+is a convention, not an enforcement, so `release.ps1` compares the published
+`ProductVersion` against the props version and refuses to pack through the
+disagreement. That refusal was then observed happening.
 
 **Verification:** publish, then run the published binary from a directory that is
 not the build output, with no SDK on `PATH`. **Negative control:** set the props
@@ -72,18 +84,29 @@ prevent, and it should be demonstrable.
 
 **Files:** `scripts/release.ps1`, `Snipwhiz.App.csproj` (Velopack package reference).
 
-- [ ] **Step 1: `vpk pack`** producing Setup.exe, a portable zip and a versioned
-  `.nupkg`, into `releases/` — gitignored, like every other build output.
-- [ ] **Step 2: `VelopackApp.Build().Run()` first in `Main`.** Velopack's hooks run
+- [x] **Step 1: `vpk pack`** producing Setup.exe, a portable zip and a versioned
+  `.nupkg`, into `Releases/` — already gitignored, like every other build output.
+  86.5 MB Setup.exe from a 199 MB on-disk publish.
+- [x] **Step 2: `VelopackApp.Build().Run()` first in `Main`.** Velopack's hooks run
   on install and uninstall by re-invoking the app with arguments; if anything else
-  runs first, an install briefly starts a real app with a tray icon.
-- [ ] **Step 3: A signing hook** that is a no-op with no certificate configured, so
-  the decision can be made later without redoing this task.
+  runs first, an install briefly starts a real app with a tray icon. This needed an
+  explicit `Program.Main` and `<StartupObject>`, because WPF generates its own
+  entry point from `App.xaml`.
+- [x] **Step 3: A signing hook** that is a no-op with no certificate configured, so
+  the decision can be made later without redoing this task. Configured by
+  environment variable — `SNIPWHIZ_SIGN_TEMPLATE` or `SNIPWHIZ_SIGN_PARAMS` — so no
+  certificate detail ever reaches the repository.
 
-**Verification:** install from Setup.exe on **a machine or VM that has never had
-the .NET SDK**, and take a screenshot with it. **Negative control:** a framework-
-dependent publish, which works perfectly on the build machine and fails on the
-clean one — that gap is the entire reason this gate needs a second machine.
+**Two negative controls passed, neither needing a second machine.** Removing
+`VelopackApp.Build().Run()` and passing `--veloapp-install`: the process was still
+running eight seconds later, having started a real tray app, which is exactly the
+failure the ordering exists to prevent. And `vpk` refuses to pack a binary whose
+`Main` does not call it — a guard that was already there and is better than the
+comment describing it.
+
+**Still open: the clean-install gate**, which needs a machine that has never had the
+SDK. Windows Sandbox covers this — free, built into Windows 11 Pro, and clean on
+*every* run rather than clean once. It is not yet enabled here.
 
 ---
 
@@ -175,6 +198,20 @@ is the whole point of the phase. A developer machine hides exactly the failures
 this spec exists to prevent, and three phases of editor work have already shown
 that the defects which matter are found by somebody using the thing rather than by
 a test suite.
+
+**Those four are covered by Windows Sandbox**, which ships with Windows 11 Pro and
+was overlooked when this plan was written. It is a disposable Windows install with
+no .NET SDK, no Visual Studio and no prior Snipwhiz, and it resets completely on
+close — so it is not an approximation of the clean machine, it is a stricter one:
+clean on every run rather than clean once. Networking is on by default, so the
+GitHub feed is reachable and the update gates fit inside a single session.
+
+    Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All
+
+**One thing it cannot check.** Sandbox cannot reboot, so autostart — the registry
+value written with consent, surviving a login — stays unverified on a clean
+machine. That is the honest residue of this approach and it belongs in the known
+gaps rather than in a gate that quietly never ran.
 
 ---
 
