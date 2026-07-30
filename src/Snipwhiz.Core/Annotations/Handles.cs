@@ -209,7 +209,7 @@ public static class Handles
     /// once at the start, not recomputed per frame, or it chases itself.
     /// </param>
     public static (GeometryState Geometry, Matrix Transform) Settle(
-        Annotation annotation, Matrix startTransform, Resized resized,
+        Annotation annotation, Matrix startTransform, GeometryState startGeometry, Resized resized,
         HandleKind handle, Point anchorImage, bool aboutCentre)
     {
         var geometry = annotation.GeometryForBounds(resized.Size);
@@ -222,12 +222,17 @@ public static class Handles
         // The true origin shift, read back from where the object actually ended up
         // rather than from Resize's prediction — the same reason as above, and the
         // callout tail depends on it being the real one.
+        //
+        // Measured against startTransform and applied to startGeometry, so it is the
+        // whole shift since the gesture began rather than an increment. This runs on
+        // every mouse-move; an increment applied to the previous frame's result
+        // compounds, and the tail accelerates away instead of holding still.
         var inverse = startTransform;
         if (inverse.HasInverse)
         {
             inverse.Invert();
             var origin = inverse.Transform(new Point(transform.OffsetX, transform.OffsetY));
-            geometry = annotation.Rebased(geometry, new Vector(origin.X, origin.Y));
+            geometry = annotation.Rebased(geometry, startGeometry, new Vector(origin.X, origin.Y));
             annotation.RestoreGeometry(geometry);
         }
 

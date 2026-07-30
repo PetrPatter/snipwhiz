@@ -69,13 +69,18 @@ public sealed class CalloutAnnotation : TextAnnotation
     /// <summary>
     /// Keeps the tip where it was pointing while the bubble grows away from it.
     ///
-    /// <para>The new origin sits at <paramref name="localShift"/> in the old frame,
-    /// so everything measured from the old origin is that much further away in the
-    /// new one. Subtracting it is the whole fix.</para>
+    /// <para>The new origin sits at <paramref name="localShift"/> in the frame the
+    /// gesture started in, so everything measured from that origin is that much
+    /// further away now. Subtracting it is the whole fix.</para>
+    ///
+    /// <para>From <paramref name="start"/>'s tail, not this state's. The shift is
+    /// measured from the beginning of the drag and this runs on every frame, so
+    /// taking it off a value that already had the last frame's shift removed
+    /// compounds it — which sends the tail flying rather than holding it still.</para>
     /// </summary>
-    public override GeometryState Rebased(GeometryState state, Vector localShift) =>
-        state is CalloutGeometryState callout
-            ? callout with { Tail = callout.Tail - localShift }
+    public override GeometryState Rebased(GeometryState state, GeometryState start, Vector localShift) =>
+        state is CalloutGeometryState callout && start is CalloutGeometryState from
+            ? callout with { Tail = from.Tail - localShift }
             : state;
 
     /// <summary>

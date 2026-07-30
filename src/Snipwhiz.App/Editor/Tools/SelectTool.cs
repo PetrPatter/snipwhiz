@@ -191,7 +191,7 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
         // and it skated around under the pointer until this was derived from the
         // result instead.
         var (geometry, transform) = Handles.Settle(
-            _target, _startTransform, resized, _handle, _anchorImage,
+            _target, _startTransform, _startGeometry, resized, _handle, _anchorImage,
             aboutCentre: (modifiers & ModifierKeys.Alt) != 0);
 
         undo.Apply(new ResizeAnnotation(

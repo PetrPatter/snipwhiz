@@ -147,7 +147,13 @@ public class CalloutTests
         callout.Tail = new Vector(0, 60);
         var before = Handles.ImagePosition(callout, HandleKind.Tail, rotateGap: 0);
 
-        var after = Handles.ImagePosition(Resize(callout, HandleKind.TopLeft, new Point(-120, -60)),
+        // Several frames, because a real drag is many and this correction is measured
+        // from the start of the gesture. Applied per frame to the previous frame's
+        // result it compounds, and the tail accelerates off across the picture —
+        // which is what the one-frame version of this test could not see.
+        var after = Handles.ImagePosition(
+            Resize(callout, HandleKind.TopLeft, frames:
+                [new Point(-60, -30), new Point(-90, -45), new Point(-120, -60)]),
             HandleKind.Tail, rotateGap: 0);
         Assert.Equal(before.X, after.X, precision: 6);
         Assert.Equal(before.Y, after.Y, precision: 6);
@@ -163,7 +169,8 @@ public class CalloutTests
         var callout = Callout();
         callout.Tail = new Vector(0, 60);
 
-        Resize(callout, HandleKind.TopLeft, new Point(-120, -60), aboutCentre: true);
+        Resize(callout, HandleKind.TopLeft, aboutCentre: true, frames:
+            [new Point(-60, -30), new Point(-120, -60)]);
 
         Assert.Equal(new Vector(0, 60), callout.Tail);
     }
@@ -188,7 +195,8 @@ public class CalloutTests
         var opposite = Handles.Opposite(handle);
         var anchor = Handles.ImagePosition(callout, opposite, rotateGap: 0);
 
-        Resize(callout, handle, new Point(-200, -140));
+        Resize(callout, handle, frames:
+            [new Point(-90, -60), new Point(-150, -100), new Point(-200, -140)]);
 
         var after = Handles.ImagePosition(callout, opposite, rotateGap: 0);
         Assert.Equal(anchor.X, after.X, precision: 6);
@@ -201,17 +209,26 @@ public class CalloutTests
     /// alone and never applied the transform that comes with it, so nothing it
     /// asserted could see the object move.
     /// </summary>
+    /// <summary>
+    /// A drag, as <c>SelectTool</c> performs it: the start transform, start geometry
+    /// and anchor are captured <b>once</b> and every frame is computed against them.
+    /// </summary>
     private static Annotation Resize(
-        Annotation annotation, HandleKind handle, Point local, bool aboutCentre = false)
+        Annotation annotation, HandleKind handle, bool aboutCentre = false, params Point[] frames)
     {
         var startTransform = annotation.Transform;
+        var startGeometry = annotation.CaptureGeometry();
         var anchor = Handles.ImagePosition(annotation, Handles.Opposite(handle), 0);
 
-        var resized = Handles.Resize(annotation, handle, local, aboutCentre: aboutCentre);
-        var (_, transform) = Handles.Settle(
-            annotation, startTransform, resized, handle, anchor, aboutCentre);
+        foreach (var local in frames)
+        {
+            var resized = Handles.Resize(annotation, handle, local, aboutCentre: aboutCentre);
+            var (_, transform) = Handles.Settle(
+                annotation, startTransform, startGeometry, resized, handle, anchor, aboutCentre);
 
-        annotation.Transform = transform;
+            annotation.Transform = transform;
+        }
+
         return annotation;
     }
 
@@ -225,7 +242,7 @@ public class CalloutTests
         var rectangle = new RectangleAnnotation { Size = new Size(40, 30) };
         var state = rectangle.GeometryForBounds(new Size(80, 60));
 
-        Assert.Same(state, rectangle.Rebased(state, new Vector(17, -9)));
+        Assert.Same(state, rectangle.Rebased(state, rectangle.CaptureGeometry(), new Vector(17, -9)));
     }
 
     [Fact]
