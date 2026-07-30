@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Snipwhiz.Core.Annotations;
 
 namespace Snipwhiz.App.Editor;
@@ -56,5 +57,5 @@ internal sealed class CropProxy : Annotation
 
     protected override bool HitTestLocal(Point local, double tolerance) => LocalBounds.Contains(local);
 
-    public override void Render(DrawingContext dc) { }
+    public override void Render(DrawingContext dc, BitmapSource source) { }
 }

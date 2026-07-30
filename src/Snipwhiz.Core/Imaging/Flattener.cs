@@ -43,7 +43,10 @@ public static class Flattener
             // pixel and the flattener applies no scale of its own.
             dc.DrawImage(source, new Rect(0, 0, source.PixelWidth, source.PixelHeight));
 
-            foreach (var annotation in document.InPaintOrder()) annotation.Render(dc);
+            // The same capture that was just drawn as the backdrop, which is what
+            // makes a pixelate sample the original rather than the composite: the
+            // objects below it are not in here.
+            foreach (var annotation in document.InPaintOrder()) annotation.Render(dc, source);
 
             dc.Pop();
         }

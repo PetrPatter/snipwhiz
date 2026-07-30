@@ -131,6 +131,13 @@ public static class ProjectStore
         w.WriteStartObject("geometry");
         switch (a)
         {
+            // Before the rectangle arm: a pixelate is one, and carries a block size
+            // a rectangle knows nothing about. Placed after, this does not compile.
+            case PixelateAnnotation p:
+                w.WriteNumber("width", p.Size.Width);
+                w.WriteNumber("height", p.Size.Height);
+                w.WriteNumber("blockSize", p.BlockSize);
+                break;
             // Covers HighlightAnnotation too — it is a rectangle, same geometry.
             case RectangleAnnotation r:
                 w.WriteNumber("width", r.Size.Width);
@@ -166,6 +173,8 @@ public static class ProjectStore
     {
         HighlightAnnotation => "highlight",
         TextAnnotation => "text",
+        // Also before the rectangle arm, and for the same reason as arrow below.
+        PixelateAnnotation => "pixelate",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
         // Before the line arm, not after: an arrow is a LineAnnotation and the first
@@ -211,7 +220,7 @@ public static class ProjectStore
         var id = e.GetProperty("id").GetGuid();
         var z = e.GetProperty("z").GetInt32();
 
-        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"))
+        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text" or "pixelate"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -231,6 +240,11 @@ public static class ProjectStore
             "highlight" => new HighlightAnnotation
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "pixelate" => new PixelateAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+                BlockSize = geometry.GetProperty("blockSize").GetDouble(),
             },
             "ellipse" => new EllipseAnnotation
             {

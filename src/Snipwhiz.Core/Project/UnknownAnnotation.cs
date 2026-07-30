@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Snipwhiz.Core.Annotations;
 
 namespace Snipwhiz.Core.Project;
@@ -44,5 +45,5 @@ public sealed class UnknownAnnotation : Annotation
 
     public override void Fit(Point from, Point to) { }
 
-    public override void Render(DrawingContext dc) { }
+    public override void Render(DrawingContext dc, BitmapSource source) { }
 }

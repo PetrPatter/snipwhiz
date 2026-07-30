@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -143,7 +144,7 @@ public sealed class TextAnnotation : Annotation
         return hit.Contains(local);
     }
 
-    public override void Render(DrawingContext dc)
+    public override void Render(DrawingContext dc, BitmapSource source)
     {
         var bounds = LocalBounds;
 

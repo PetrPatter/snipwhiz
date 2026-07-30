@@ -145,6 +145,32 @@ public class ProjectStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A pixelate is a rectangle plus a block size, so it can fail in both of the
+    /// ways a subclass can: coming back as its base type, and coming back as itself
+    /// with the extra number lost. A redaction reopened at the default block size is
+    /// a redaction that has changed how much it hides.
+    /// </summary>
+    [Fact]
+    public void A_pixelate_round_trips_with_its_block_size()
+    {
+        var pixelate = new PixelateAnnotation
+        {
+            Size = new Size(180, 60),
+            BlockSize = 21,
+            Transform = new Matrix(1, 0, 0, 1, 250, 150),
+        };
+
+        var path = Path_("pixelate.ssproj");
+        ProjectStore.Save(path, Scene(pixelate));
+
+        Assert.Contains("\"pixelate\"", File.ReadAllText(path));
+
+        var loaded = Assert.IsType<PixelateAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Size(180, 60), loaded.Size);
+        Assert.Equal(21, loaded.BlockSize);
+    }
+
+    /// <summary>
     /// The whole reason <see cref="HighlightAnnotation"/> exists as a type: it draws
     /// exactly like a rectangle, so nothing else in the suite would notice it coming
     /// back as one — and a highlight saved as a rectangle can never be recovered.

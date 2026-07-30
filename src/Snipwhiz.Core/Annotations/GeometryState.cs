@@ -32,5 +32,12 @@ public sealed record LineGeometryState(Vector Delta) : GeometryState;
 /// </summary>
 public sealed record TextGeometryState(string Text, double FontSize) : GeometryState;
 
+/// <summary>
+/// A pixelate is a box plus a block size, and the block size is geometry rather
+/// than style for the same reason text's font size is: it changes how big the thing
+/// is, and undo has to put it back.
+/// </summary>
+public sealed record PixelateGeometryState(Size Size, double BlockSize) : GeometryState;
+
 /// <summary>Carried by an annotation this build cannot interpret, and never edited.</summary>
 public sealed record OpaqueGeometryState : GeometryState;

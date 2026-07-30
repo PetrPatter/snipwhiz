@@ -182,6 +182,19 @@ internal static class WysiwygVerification
         arrow.Fit(new Point(90, 250), new Point(330, 140));
         document.Annotations.Add(arrow);
 
+        // A pixelate, rotated, straddling the crop edge and overlapping the objects
+        // above it. This is the first annotation that samples the capture, and the
+        // one place a second render path could reappear after phase B closed all the
+        // others: if the canvas ever sampled what is on screen while the flattener
+        // sampled the file, everything under this rectangle would differ and nothing
+        // else in the suite would say so.
+        var pixelate = new PixelateAnnotation { ZIndex = 7, BlockSize = 9 };
+        pixelate.Fit(new Point(360, 210), new Point(500, 300));
+        var turned = pixelate.Transform;
+        turned.RotateAt(-12, turned.OffsetX, turned.OffsetY);
+        pixelate.Transform = turned;
+        document.Annotations.Add(pixelate);
+
         return document;
     }
 

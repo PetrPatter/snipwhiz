@@ -58,6 +58,7 @@ public partial class EditorView : UserControl
         ArrowToolButton.Click += (_, _) => UseShape(ArrowToolButton, () => new ArrowAnnotation());
         HighlightToolButton.Click += (_, _) => UseShape(HighlightToolButton, () => new HighlightAnnotation());
         TextToolButton.Click += (_, _) => UseShape(TextToolButton, () => new TextAnnotation());
+        PixelateToolButton.Click += (_, _) => UseShape(PixelateToolButton, () => new PixelateAnnotation());
         CropToolButton.Click += (_, _) => UseCrop();
 
         Canvas.SelectionChanged += RefreshStatus;
@@ -560,6 +561,7 @@ public partial class EditorView : UserControl
             case Key.A when !control: UseShape(ArrowToolButton, () => new ArrowAnnotation()); break;
             case Key.H when !control: UseShape(HighlightToolButton, () => new HighlightAnnotation()); break;
             case Key.T when !control: UseShape(TextToolButton, () => new TextAnnotation()); break;
+            case Key.P when !control: UseShape(PixelateToolButton, () => new PixelateAnnotation()); break;
             case Key.C when !control: UseCrop(); break;
 
             case Key.Left: Nudge(-Step(shift), 0); break;

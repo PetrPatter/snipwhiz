@@ -73,6 +73,9 @@
                 <ToggleButton x:Name="TextToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Text  (T)"/>
+                <ToggleButton x:Name="PixelateToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE71F;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Pixelate  (P)"/>
                 <ToggleButton x:Name="CropToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE7A8;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Crop  (C)"/>

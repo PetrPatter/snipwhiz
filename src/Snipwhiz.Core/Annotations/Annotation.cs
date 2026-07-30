@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -163,7 +164,24 @@ public abstract class Annotation
         return HitTestLocal(inverse.Transform(imagePoint), tolerance);
     }
 
-    public abstract void Render(DrawingContext dc);
+    /// <summary>
+    /// Draws this object.
+    ///
+    /// <para><paramref name="source"/> is the <b>original capture</b>, and every
+    /// annotation is handed it whether or not it wants it. Most do not: a rectangle
+    /// is a rectangle. Blur, pixelate and magnify are not pure vector objects — they
+    /// have to look at pixels — and the alternative to one signature that can express
+    /// that is a second render entry point for the ones that sample, which is the
+    /// exact shape of the thing §1 and the WYSIWYG gate exist to prevent.</para>
+    ///
+    /// <para><b>The original, not the composite</b> (§4.9). Sampling what is beneath
+    /// would make paint order load-bearing, force a re-render of every pixel tool
+    /// whenever anything below it changed, and cycle when two blurs overlap. The
+    /// documented consequence is that an arrow underneath a blur is not blurred —
+    /// correct for a redaction tool, because the thing being hidden is in the
+    /// capture.</para>
+    /// </summary>
+    public abstract void Render(DrawingContext dc, BitmapSource source);
 
     /// <summary>Frozen, so one instance is safe on the canvas thread and the flattener's.</summary>
     protected Brush? FillBrush()

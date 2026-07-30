@@ -171,10 +171,18 @@ internal static class TextSeamVerification
             InkCount(drawn));
     }
 
+    /// <summary>
+    /// Text draws glyphs, not pixels, so the capture it is handed is never read.
+    /// A one-pixel stand-in says that out loud; passing a real capture here would
+    /// suggest this gate depended on it.
+    /// </summary>
+    private static readonly BitmapSource NoCapture =
+        BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[4], 4);
+
     private static BitmapSource RenderAnnotation(TextAnnotation annotation, double dpi)
     {
         var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen()) annotation.Render(dc);
+        using (var dc = visual.RenderOpen()) annotation.Render(dc, NoCapture);
         return Render(visual, dpi);
     }
 

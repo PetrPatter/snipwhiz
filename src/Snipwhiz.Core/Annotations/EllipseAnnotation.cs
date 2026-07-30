@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Snipwhiz.Core.Annotations;
 
@@ -55,7 +56,7 @@ public sealed class EllipseAnnotation : Annotation
         return x * x + y * y <= 1;
     }
 
-    public override void Render(DrawingContext dc)
+    public override void Render(DrawingContext dc, BitmapSource source)
     {
         dc.PushTransform(new MatrixTransform(Transform));
         dc.DrawEllipse(FillBrush(), StrokePen(), new Point(0, 0), Size.Width / 2, Size.Height / 2);

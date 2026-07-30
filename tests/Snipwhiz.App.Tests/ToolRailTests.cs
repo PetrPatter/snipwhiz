@@ -31,8 +31,27 @@ public class ToolRailTests
         { Key.A, "ArrowToolButton" },
         { Key.H, "HighlightToolButton" },
         { Key.T, "TextToolButton" },
+        { Key.P, "PixelateToolButton" },
         { Key.C, "CropToolButton" },
     };
+
+    /// <summary>
+    /// The list above is hand-written, which is the hazard this whole file exists to
+    /// catch — so it is checked against the rail rather than trusted. A tool added to
+    /// the rail without a case here would otherwise be exactly the untested button
+    /// arrow and highlight were.
+    /// </summary>
+    [Fact]
+    public void Every_button_on_the_rail_has_a_shortcut_covered_here()
+    {
+        Harness.Editor(editor =>
+        {
+            var onRail = editor.ToolRail.Children.OfType<ToggleButton>().Select(b => b.Name);
+            var covered = Shortcuts.Select(row => (string)row[1]!);
+
+            Assert.Equal([.. onRail.Order()], [.. covered.Order()]);
+        });
+    }
 
     [Theory]
     [MemberData(nameof(Shortcuts))]
