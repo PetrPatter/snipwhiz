@@ -349,9 +349,28 @@ because the thing being hidden is in the capture.
 its current position*, so moving it must recompute — rev. 1 said "recompute on
 resize, not on move", which would drag a stale patch across the image and, for a
 redaction tool, display the wrong content. The cache is keyed by
-`(region, radius)`. During an interactive drag the region renders with a cheap
+`(region, radius)`. ~~During an interactive drag the region renders with a cheap
 box-blur approximation; the separable Gaussian is computed on a background thread
-and swapped in on release.
+and swapped in on release.~~
+
+**The two quality levels are superseded, during phase C.** There is one blur and it
+is always the good one, computed synchronously. Two facts removed the need for the
+split:
+
+- Three successive box passes **are** a Gaussian to within a few percent — the
+  standard approximation — and a running-sum box pass costs the same at radius 40
+  as at radius 2.
+- A blur is a low-pass filter, so it can be computed on a **shrunk copy**: the
+  detail lost by shrinking is precisely the detail the blur exists to destroy.
+
+Measured, because the first implementation was genuinely too slow and this section
+was right to worry. The whole of a 4K capture at maximum radius: **2,233 ms**
+full-resolution, **40 ms** on a shrunk copy. With no slow path left there is nothing
+for a background thread to do, and the cancellation, the swap-in, the second cache
+entry and the interactive flag all go with it.
+
+The caching rule above is unchanged and is the part that matters: keyed by region,
+so moving recomputes.
 
 ### 4.10 Document operations change the canvas, not the file
 

@@ -138,6 +138,11 @@ public static class ProjectStore
                 w.WriteNumber("height", p.Size.Height);
                 w.WriteNumber("blockSize", p.BlockSize);
                 break;
+            case BlurAnnotation b:
+                w.WriteNumber("width", b.Size.Width);
+                w.WriteNumber("height", b.Size.Height);
+                w.WriteNumber("radius", b.Radius);
+                break;
             // Covers HighlightAnnotation too — it is a rectangle, same geometry.
             case RectangleAnnotation r:
                 w.WriteNumber("width", r.Size.Width);
@@ -175,6 +180,7 @@ public static class ProjectStore
         TextAnnotation => "text",
         // Also before the rectangle arm, and for the same reason as arrow below.
         PixelateAnnotation => "pixelate",
+        BlurAnnotation => "blur",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
         // Before the line arm, not after: an arrow is a LineAnnotation and the first
@@ -220,7 +226,8 @@ public static class ProjectStore
         var id = e.GetProperty("id").GetGuid();
         var z = e.GetProperty("z").GetInt32();
 
-        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text" or "pixelate"))
+        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"
+            or "pixelate" or "blur"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -245,6 +252,11 @@ public static class ProjectStore
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
                 BlockSize = geometry.GetProperty("blockSize").GetDouble(),
+            },
+            "blur" => new BlurAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+                Radius = geometry.GetProperty("radius").GetDouble(),
             },
             "ellipse" => new EllipseAnnotation
             {

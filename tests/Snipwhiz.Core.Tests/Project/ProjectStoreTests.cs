@@ -170,6 +170,26 @@ public class ProjectStoreTests : IDisposable
         Assert.Equal(21, loaded.BlockSize);
     }
 
+    [Fact]
+    public void A_blur_round_trips_with_its_radius()
+    {
+        var blur = new BlurAnnotation
+        {
+            Size = new Size(200, 40),
+            Radius = 19,
+            Transform = new Matrix(1, 0, 0, 1, 120, 90),
+        };
+
+        var path = Path_("blur.ssproj");
+        ProjectStore.Save(path, Scene(blur));
+
+        Assert.Contains("\"blur\"", File.ReadAllText(path));
+
+        var loaded = Assert.IsType<BlurAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Size(200, 40), loaded.Size);
+        Assert.Equal(19, loaded.Radius);
+    }
+
     /// <summary>
     /// The whole reason <see cref="HighlightAnnotation"/> exists as a type: it draws
     /// exactly like a rectangle, so nothing else in the suite would notice it coming

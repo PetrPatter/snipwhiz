@@ -39,5 +39,8 @@ public sealed record TextGeometryState(string Text, double FontSize) : GeometryS
 /// </summary>
 public sealed record PixelateGeometryState(Size Size, double BlockSize) : GeometryState;
 
+/// <summary>The same shape as a pixelate's, for the same reason.</summary>
+public sealed record BlurGeometryState(Size Size, double Radius) : GeometryState;
+
 /// <summary>Carried by an annotation this build cannot interpret, and never edited.</summary>
 public sealed record OpaqueGeometryState : GeometryState;

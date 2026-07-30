@@ -195,6 +195,14 @@ internal static class WysiwygVerification
         pixelate.Transform = turned;
         document.Annotations.Add(pixelate);
 
+        // A blur over the busiest part of the scene. It caches its result, which is
+        // the one thing here that could make the canvas and the export disagree
+        // without either of them being wrong on its own — two renders, two caches,
+        // and only a diff to say whether they hold the same pixels.
+        var blur = new BlurAnnotation { ZIndex = 8, Radius = 14 };
+        blur.Fit(new Point(70, 60), new Point(210, 150));
+        document.Annotations.Add(blur);
+
         return document;
     }
 
