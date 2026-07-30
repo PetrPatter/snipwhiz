@@ -207,7 +207,15 @@ internal static class WysiwygVerification
         // annotation that paints most of the picture, so it covers whether a
         // full-canvas geometry lands identically in both paths — and a strong dim
         // here would flatten the channel deltas the control below depends on.
-        var spotlight = new SpotlightAnnotation { ZIndex = 9 };
+        // A magnifier aimed somewhere other than where it is drawn — the only object
+        // here that reads the capture at one place and paints it at another, which
+        // is a distinct way for two render paths to disagree.
+        var magnify = new MagnifyAnnotation { ZIndex = 9, Zoom = 3 };
+        magnify.Fit(new Point(300, 40), new Point(420, 130));
+        magnify.SourceCentre = new Point(140, 300);
+        document.Annotations.Add(magnify);
+
+        var spotlight = new SpotlightAnnotation { ZIndex = 10 };
         spotlight.Fit(new Point(120, 100), new Point(400, 260));
         spotlight.SizeControl = 30;
         document.Annotations.Add(spotlight);

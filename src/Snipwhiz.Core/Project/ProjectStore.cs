@@ -138,6 +138,15 @@ public static class ProjectStore
                 w.WriteNumber("height", p.Size.Height);
                 w.WriteNumber("blockSize", p.BlockSize);
                 break;
+            case MagnifyAnnotation magnify:
+                w.WriteNumber("width", magnify.Size.Width);
+                w.WriteNumber("height", magnify.Size.Height);
+                w.WriteNumber("zoom", magnify.Zoom);
+                // Absolute, so a magnifier dragged away from its subject reopens
+                // still pointing at the subject rather than at itself.
+                w.WriteNumber("sourceX", magnify.SourceCentre.X);
+                w.WriteNumber("sourceY", magnify.SourceCentre.Y);
+                break;
             case BlurAnnotation b:
                 w.WriteNumber("width", b.Size.Width);
                 w.WriteNumber("height", b.Size.Height);
@@ -186,6 +195,7 @@ public static class ProjectStore
         // the tag has to come first, or a spotlight reopens as an opaque black box
         // over the whole picture.
         SpotlightAnnotation => "spotlight",
+        MagnifyAnnotation => "magnify",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
         // Before the line arm, not after: an arrow is a LineAnnotation and the first
@@ -232,7 +242,7 @@ public static class ProjectStore
         var z = e.GetProperty("z").GetInt32();
 
         if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"
-            or "pixelate" or "blur" or "spotlight"))
+            or "pixelate" or "blur" or "spotlight" or "magnify"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -263,6 +273,14 @@ public static class ProjectStore
             "spotlight" => new SpotlightAnnotation
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "magnify" => new MagnifyAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+                Zoom = geometry.GetProperty("zoom").GetDouble(),
+                SourceCentre = new Point(
+                    geometry.GetProperty("sourceX").GetDouble(),
+                    geometry.GetProperty("sourceY").GetDouble()),
             },
             "blur" => new BlurAnnotation
             {

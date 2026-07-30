@@ -191,6 +191,32 @@ public class ProjectStoreTests : IDisposable
     }
 
     /// <summary>
+    /// The source centre is absolute, so a magnifier dragged away from its subject
+    /// must reopen still pointing at the subject. Stored relative to the lens it
+    /// would reopen pointing at itself, which renders as a bordered copy of whatever
+    /// it happens to be sitting on.
+    /// </summary>
+    [Fact]
+    public void A_magnifier_round_trips_still_pointing_at_its_subject()
+    {
+        var magnify = new MagnifyAnnotation
+        {
+            Size = new Size(120, 90),
+            Zoom = 3,
+            SourceCentre = new Point(410, 275),
+            Transform = new Matrix(1, 0, 0, 1, 80, 60),
+        };
+
+        var path = Path_("magnify.ssproj");
+        ProjectStore.Save(path, Scene(magnify));
+
+        var loaded = Assert.IsType<MagnifyAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Point(410, 275), loaded.SourceCentre);
+        Assert.Equal(3, loaded.Zoom);
+        Assert.Equal(new Size(120, 90), loaded.Size);
+    }
+
+    /// <summary>
     /// A spotlight's geometry really is a rectangle's, so the only thing standing
     /// between it and reopening as an opaque black box over the whole picture is its
     /// type tag.

@@ -42,5 +42,13 @@ public sealed record PixelateGeometryState(Size Size, double BlockSize) : Geomet
 /// <summary>The same shape as a pixelate's, for the same reason.</summary>
 public sealed record BlurGeometryState(Size Size, double Radius) : GeometryState;
 
+/// <summary>
+/// A magnifier is two rectangles: the lens, which is <paramref name="Size"/> and the
+/// transform every annotation has, and the subject, which is
+/// <paramref name="SourceCentre"/> in absolute image space. Both are geometry
+/// because undo has to put both back.
+/// </summary>
+public sealed record MagnifyGeometryState(Size Size, double Zoom, Point SourceCentre) : GeometryState;
+
 /// <summary>Carried by an annotation this build cannot interpret, and never edited.</summary>
 public sealed record OpaqueGeometryState : GeometryState;
