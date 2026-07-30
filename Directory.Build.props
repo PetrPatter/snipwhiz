@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    The one place a version is set.
+
+    Four things carry it: the assembly, the installer, the update feed, and
+    whatever the app shows a human. Four places to set it is three places to
+    forget, and the failure is silent - an installer that says 1.0.1 next to an
+    About box that says 1.0.0 is not a build error, it is a support conversation.
+
+    The release script reads this and passes it to vpk; the About text reads the
+    assembly it is compiled into. Neither restates the number.
+  -->
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+</Project>

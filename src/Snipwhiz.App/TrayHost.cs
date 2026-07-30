@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Snipwhiz.Core;
@@ -14,6 +15,18 @@ public sealed class TrayHost : IDisposable
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValue = "Snipwhiz";
+
+    /// <summary>
+    /// Read from the running assembly, never from a constant, so the About text
+    /// cannot claim a version the binary is not. The informational version is the
+    /// one that matches the installer's semver; it carries a <c>+commit</c> suffix
+    /// when the SDK stamps one, which is for a build log rather than a menu.
+    /// </summary>
+    private static string Version =>
+        typeof(TrayHost).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            .Split('+')[0]
+        ?? "unknown";
 
     private readonly NotifyIcon _icon;
     private readonly Settings _settings;
@@ -46,6 +59,9 @@ public sealed class TrayHost : IDisposable
         };
         autostart.CheckedChanged += (_, _) => SetAutostart(autostart.Checked);
         menu.Items.Add(autostart);
+
+        menu.Items.Add($"About Snipwhiz {Version}", null, (_, _) => MessageBox.Show(
+            $"Snipwhiz {Version}", "About Snipwhiz", MessageBoxButtons.OK, MessageBoxIcon.Information));
 
         menu.Items.Add("Exit", null, (_, _) => ExitRequested?.Invoke());
 
