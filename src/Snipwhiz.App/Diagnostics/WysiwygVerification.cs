@@ -73,13 +73,19 @@ internal static class WysiwygVerification
             canvas.Load(source, document);
             var onScreen = canvas.RenderSceneAtImageScale();
 
-            // The scene the flattener is given. Under the control it is nudged one
-            // pixel, standing in for a flattener that draws differently — the point
-            // is whether the diff has the resolution to notice, not to plant a fake
-            // bug in production code.
-            var exported = Flattener.Render(source, BreakWysiwyg ? Nudged(document) : document);
+            // Under the control the scene is nudged one pixel, standing in for a
+            // flattener that draws differently — the point is whether the diff has
+            // the resolution to notice, not to plant a fake bug in production code.
+            //
+            // Nudged in place, after the canvas has already rendered to a bitmap.
+            // Building a copy meant reconstructing each annotation, which quietly
+            // turned every subclass back into its base type — a highlight would have
+            // been flattened as a plain rectangle and the control would still have
+            // "passed" for the wrong reason.
+            if (BreakWysiwyg) Nudge(document);
+            var exported = Flattener.Render(source, document);
 
-            Write(Compare(onScreen, exported));
+            Write(Compare(onScreen, exported), exported.PixelWidth, exported.PixelHeight);
 
             window.Close();
             Application.Current.Shutdown();
@@ -129,6 +135,15 @@ internal static class WysiwygVerification
     {
         var document = new SceneDocument { CaptureId = Guid.CreateVersion7() };
 
+        // Cropped, and deliberately off-origin so a missing translate shows up as a
+        // shift rather than as nothing at all. Several objects below straddle its
+        // edge, which is what makes this a test of clipping and not merely of size:
+        // the two paths have to agree about the half of a rectangle that is outside.
+        // They agree by construction — both translate by the crop origin into a
+        // crop-sized target and let the target's own edge do the clipping — and this
+        // is what would say so if that ever became two mechanisms.
+        document.Crop = new Rect(40, 30, 430, 300);
+
         // Plain outline.
         document.Annotations.Add(Rect(60, 50, 160, 90, 0,
             AnnotationStyle.Default with { StrokeWidth = 4 }));
@@ -149,6 +164,24 @@ internal static class WysiwygVerification
         document.Annotations.Add(Rect(40, 320, 120, 20, 0,
             AnnotationStyle.Default with { Stroke = Colors.LimeGreen, StrokeWidth = 1 }, z: 4));
 
+        // A highlight over the top of everything, at its shipping default. Task B3
+        // traded §4.5's multiply blend for a translucent fill precisely so this gate
+        // could cover it; an Effect would have rendered on screen and not in the
+        // export, and this diff is what would have said so.
+        var highlight = new HighlightAnnotation { ZIndex = 5 };
+        highlight.Fit(new Point(150, 130), new Point(370, 174));
+        document.Annotations.Add(highlight);
+
+        // An arrow crossing the highlight: a filled head over a translucent fill is
+        // the compositing case most likely to diverge between two render paths.
+        var arrow = new ArrowAnnotation
+        {
+            ZIndex = 6,
+            Style = AnnotationStyle.Default with { Stroke = Colors.White, StrokeWidth = 7 },
+        };
+        arrow.Fit(new Point(90, 250), new Point(330, 140));
+        document.Annotations.Add(arrow);
+
         return document;
     }
 
@@ -161,22 +194,14 @@ internal static class WysiwygVerification
         return new RectangleAnnotation { Size = new Size(w, h), Transform = transform, Style = style, ZIndex = z };
     }
 
-    private static SceneDocument Nudged(SceneDocument document)
+    private static void Nudge(SceneDocument document)
     {
-        var copy = new SceneDocument { CaptureId = document.CaptureId };
-        foreach (var annotation in document.Annotations.OfType<RectangleAnnotation>())
+        foreach (var annotation in document.Annotations)
         {
             var moved = annotation.Transform;
             moved.OffsetX += 1;
-            copy.Annotations.Add(new RectangleAnnotation
-            {
-                Size = annotation.Size,
-                Transform = moved,
-                Style = annotation.Style,
-                ZIndex = annotation.ZIndex,
-            });
+            annotation.Transform = moved;
         }
-        return copy;
     }
 
     /// <summary>A gradient, so a shifted or missing annotation cannot hide against a flat field.</summary>
@@ -200,16 +225,16 @@ internal static class WysiwygVerification
         return source;
     }
 
-    private static void Write(Diff diff)
+    private static void Write(Diff diff, int width, int height)
     {
         var mode = BreakWysiwyg
             ? "NEGATIVE CONTROL (exported scene shifted one pixel)"
             : "POSITIVE (canvas visuals vs flattener)";
 
-        var total = Width * Height;
+        var total = width * height;
         File.WriteAllText(ResultPath,
             $"mode={mode}\n" +
-            $"imageSize={Width}x{Height}   ({total:N0} pixels)\n" +
+            $"capture={Width}x{Height}, compared over {width}x{height}   ({total:N0} pixels)\n" +
             "\n" +
             $"differingPixels={diff.DifferingPixels}\n" +
             $"maxChannelDelta={diff.MaxChannelDelta}\n" +

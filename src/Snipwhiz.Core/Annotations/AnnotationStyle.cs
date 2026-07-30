@@ -15,7 +15,7 @@ namespace Snipwhiz.Core.Annotations;
 /// brushes are mutable, thread-affine unless frozen, and awkward to serialize.
 /// Rendering converts.</para>
 ///
-/// <para>This grows as phases land â€” arrowhead shape, font, shadow presets, corner
+/// <para>This grows as phases land — arrowhead shape, font, shadow presets, corner
 /// radius. Phase A carries what a rectangle needs.</para>
 /// </summary>
 public sealed record AnnotationStyle
@@ -27,7 +27,7 @@ public sealed record AnnotationStyle
 
     public double StrokeWidth { get; init; } = 4;
 
-    /// <summary>Null means unfilled â€” the shape shows what is underneath it.</summary>
+    /// <summary>Null means unfilled — the shape shows what is underneath it.</summary>
     public Color? Fill { get; init; }
 
     public double Opacity { get; init; } = 1;

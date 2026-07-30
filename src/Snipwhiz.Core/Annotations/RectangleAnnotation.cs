@@ -8,8 +8,11 @@ namespace Snipwhiz.Core.Annotations;
 /// whole foundation — create by drag, hit-test, select, resize from eight handles,
 /// rotate, undo, serialize, flatten, library refresh — with no text entry, pixel
 /// sampling or geometry subtleties to debug alongside it.
+///
+/// <para>Not sealed: <see cref="HighlightAnnotation"/> is this shape with a
+/// different default style.</para>
 /// </summary>
-public sealed class RectangleAnnotation : Annotation
+public class RectangleAnnotation : Annotation
 {
     /// <summary>
     /// Size in image pixels. Resizing changes this rather than a scale in
@@ -24,14 +27,19 @@ public sealed class RectangleAnnotation : Annotation
     /// <summary>Places a rectangle spanning two image-space points, unrotated.</summary>
     public static RectangleAnnotation FromDrag(Point from, Point to, AnnotationStyle? style = null)
     {
-        var rect = new Rect(from, to);
-        return new RectangleAnnotation
-        {
-            Size = rect.Size,
-            Transform = new Matrix(1, 0, 0, 1, rect.X + rect.Width / 2, rect.Y + rect.Height / 2),
-            Style = style ?? AnnotationStyle.Default,
-        };
+        var shape = new RectangleAnnotation { Style = style ?? AnnotationStyle.Default };
+        shape.Fit(from, to);
+        return shape;
     }
+
+    public override void Fit(Point from, Point to)
+    {
+        var rect = new Rect(from, to);
+        Size = rect.Size;
+        Transform = new Matrix(1, 0, 0, 1, rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+    }
+
+    public override GeometryState GeometryForBounds(Size size) => new RectangleGeometryState(size);
 
     /// <summary>
     /// The interior counts, not just the outline.

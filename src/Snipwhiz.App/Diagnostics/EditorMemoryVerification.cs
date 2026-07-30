@@ -56,7 +56,9 @@ internal static class EditorMemoryVerification
         if (!IsEnabled) return;
 
         var records = store.Recent(10);
-        var editor = new EditorView(store);
+        // Throwaway settings in a temp directory: the gate opens and closes ten
+        // documents and must not write tool defaults into the real settings file.
+        var editor = new EditorView(store, new Core.Settings(), Path.GetTempPath());
         var window = new Window
         {
             Title = "Snipwhiz editor memory gate",

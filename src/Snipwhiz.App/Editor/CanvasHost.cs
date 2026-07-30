@@ -46,13 +46,24 @@ public sealed class CanvasHost : FrameworkElement
     private double _zoom = 1;
     private Vector _pan;
 
+    /// <summary>What <see cref="ApplyView"/> last sized the view to.</summary>
+    private Size _viewedContent = Size.Empty;
+
     private readonly ContainerVisual _layers = new();
+
+    /// <summary>
+    /// Carries the crop's clip. Its own space is element space — it has no transform
+    /// of its own — which is what makes the clip rectangle expressible at all;
+    /// putting it on <see cref="_root"/> would clip in image space, before the view.
+    /// </summary>
+    private readonly ContainerVisual _scene = new();
 
     public CanvasHost()
     {
         AddVisualChild(_layers);
-        _layers.Children.Add(_root);
+        _layers.Children.Add(_scene);
         _layers.Children.Add(_overlay);
+        _scene.Children.Add(_root);
         _root.Children.Add(_backdrop);
         ClipToBounds = true;
         Focusable = true;
@@ -67,6 +78,9 @@ public sealed class CanvasHost : FrameworkElement
     public Rect? Marquee { get; set; }
 
     public event Action? SelectionChanged;
+
+    /// <summary>Zoom or pan changed. Anything positioned in element space has to move with it.</summary>
+    public event Action? ViewChanged;
 
     public void SetSelection(IEnumerable<Annotation> annotations)
     {
@@ -101,6 +115,29 @@ public sealed class CanvasHost : FrameworkElement
     public Size ImageSize => _source is null
         ? Size.Empty
         : new Size(_source.PixelWidth, _source.PixelHeight);
+
+    /// <summary>
+    /// Show the whole capture even where the document is cropped.
+    ///
+    /// <para>Set while the crop tool is active, so the part being cropped away is
+    /// still there to drag back. Off, the outside is not dimmed — it is gone.</para>
+    /// </summary>
+    public bool ShowUncropped { get; set; }
+
+    /// <summary>The crop the view is currently honouring, or null for the whole capture.</summary>
+    private Rect? ViewCrop => ShowUncropped ? null : _document?.Crop;
+
+    /// <summary>Top-left of what is being looked at, in image pixels.</summary>
+    public Point ContentOrigin => ViewCrop?.Location ?? new Point(0, 0);
+
+    /// <summary>How big the visible picture is — the crop when there is one.</summary>
+    public Size ContentSize => ViewCrop?.Size ?? ImageSize;
+
+    /// <summary>
+    /// A pending crop rectangle to draw, in image space. Only the crop tool sets it,
+    /// and only while it is active.
+    /// </summary>
+    public Rect? CropPreview { get; set; }
 
     protected override int VisualChildrenCount => 1;
 
@@ -168,12 +205,20 @@ public sealed class CanvasHost : FrameworkElement
     /// </summary>
     internal BitmapSource RenderSceneAtImageScale()
     {
+        // The document's crop, not the view's: the flattener knows nothing about the
+        // crop tool showing the outside, and the gate compares against the flattener.
+        var crop = _document?.Crop;
+        var origin = crop?.Location ?? new Point(0, 0);
+        var size = crop?.Size ?? ImageSize;
+
         var view = _root.Transform;
-        _root.Transform = System.Windows.Media.Transform.Identity;
+        var offset = Matrix.Identity;
+        offset.Translate(-origin.X, -origin.Y);
+        _root.Transform = new MatrixTransform(offset);
         try
         {
             var target = new RenderTargetBitmap(
-                (int)ImageSize.Width, (int)ImageSize.Height, 96, 96, PixelFormats.Pbgra32);
+                (int)Math.Round(size.Width), (int)Math.Round(size.Height), 96, 96, PixelFormats.Pbgra32);
             target.Render(_root);
             target.Freeze();
             return target;
@@ -222,12 +267,20 @@ public sealed class CanvasHost : FrameworkElement
     // ---- view -------------------------------------------------------------
 
     /// <summary>Element coordinates to image pixels.</summary>
-    public Point ToImage(Point elementPoint) =>
-        new((elementPoint.X - _pan.X) / _zoom, (elementPoint.Y - _pan.Y) / _zoom);
+    public Point ToImage(Point elementPoint)
+    {
+        var origin = ContentOrigin;
+        return new((elementPoint.X - _pan.X) / _zoom + origin.X,
+                   (elementPoint.Y - _pan.Y) / _zoom + origin.Y);
+    }
 
     /// <summary>Image pixels to element coordinates.</summary>
-    public Point ToElement(Point imagePoint) =>
-        new(imagePoint.X * _zoom + _pan.X, imagePoint.Y * _zoom + _pan.Y);
+    public Point ToElement(Point imagePoint)
+    {
+        var origin = ContentOrigin;
+        return new((imagePoint.X - origin.X) * _zoom + _pan.X,
+                   (imagePoint.Y - origin.Y) * _zoom + _pan.Y);
+    }
 
     /// <summary>
     /// A length on screen, in image pixels.
@@ -267,30 +320,67 @@ public sealed class CanvasHost : FrameworkElement
     {
         if (_source is null || ActualWidth <= 0 || ActualHeight <= 0) return;
 
-        var scale = Math.Min(ActualWidth / ImageSize.Width, ActualHeight / ImageSize.Height);
+        var content = ContentSize;
+        if (content.Width <= 0 || content.Height <= 0) return;
+
+        var scale = Math.Min(ActualWidth / content.Width, ActualHeight / content.Height);
         SetZoomCentred(Math.Clamp(Math.Min(scale, 1.0), MinZoom, MaxZoom));
     }
 
     public void ActualSize() => SetZoomCentred(1);
 
+    /// <summary>
+    /// Re-fits if the document's crop changed underneath the view.
+    ///
+    /// <para>Undo and redo edit the document directly, and the crop is the one part
+    /// of it the <i>view</i> is built from — <see cref="Rebuild"/> re-draws the
+    /// objects but leaves the transform and the clip sized to the old crop, so
+    /// undoing a crop looked like nothing had happened.</para>
+    ///
+    /// <para>Guarded on the size so undoing anything else — a move, a style change —
+    /// does not yank the zoom the user set.</para>
+    /// </summary>
+    public void SyncView()
+    {
+        if (ContentSize != _viewedContent) Fit();
+    }
+
     private void SetZoomCentred(double zoom)
     {
         if (_source is null) return;
         _zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+        var content = ContentSize;
         _pan = new Vector(
-            (ActualWidth - ImageSize.Width * _zoom) / 2,
-            (ActualHeight - ImageSize.Height * _zoom) / 2);
+            (ActualWidth - content.Width * _zoom) / 2,
+            (ActualHeight - content.Height * _zoom) / 2);
         ApplyView();
     }
 
     private void ApplyView()
     {
+        var origin = ContentOrigin;
+
         var view = Matrix.Identity;
+        // The crop shifts the picture; annotation geometry is in image space and
+        // rides along, which is why cropping moves the objects with the picture
+        // rather than sliding them across it. The flattener does the same translate.
+        view.Translate(-origin.X, -origin.Y);
         view.Scale(_zoom, _zoom);
         view.Translate(_pan.X, _pan.Y);
         _root.Transform = new MatrixTransform(view);
+
+        // Cosmetic only: it hides what falls outside the crop on a canvas element
+        // larger than the picture. The exported bitmap is crop-sized, so the
+        // flattener needs no equivalent — the clip there is the bitmap's own edge.
+        var content = ContentSize;
+        _viewedContent = content;
+        var clip = new RectangleGeometry(new Rect(
+            _pan.X, _pan.Y, content.Width * _zoom, content.Height * _zoom));
+        clip.Freeze();
+        _scene.Clip = clip;
         // Handles are positioned from image space, so they move when the view does.
         RefreshOverlay();
+        ViewChanged?.Invoke();
     }
 
     // ---- navigation input -------------------------------------------------

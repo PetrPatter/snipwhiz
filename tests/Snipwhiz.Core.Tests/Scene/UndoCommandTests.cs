@@ -124,6 +124,30 @@ public class UndoCommandTests : IDisposable
         AssertRoundTrips(document, new ReorderAnnotation(annotation, annotation.ZIndex, 7));
     }
 
+    [Fact]
+    public void Crop_round_trips()
+    {
+        var document = Empty();
+        document.Annotations.Add(Rect());
+
+        AssertRoundTrips(document, new CropDocument(null, new Rect(10, 20, 300, 200)));
+    }
+
+    [Fact]
+    public void Cropping_keeps_every_annotation_including_the_ones_it_hides()
+    {
+        // The crop is a view on the document, not a knife. If applying one ever
+        // dropped what it put out of sight, "widen it again next week" would be a
+        // promise the format could not keep.
+        var document = Empty();
+        document.Annotations.Add(Rect(x: 20, y: 20));
+        document.Annotations.Add(Rect(x: 900, y: 900));
+
+        new UndoStack(document).Apply(new CropDocument(null, new Rect(0, 0, 100, 100)));
+
+        Assert.Equal(2, document.Annotations.Count);
+    }
+
     // ---- the harness's own negative control -------------------------------
 
     /// <summary>Changes the scene and then does not put it back.</summary>

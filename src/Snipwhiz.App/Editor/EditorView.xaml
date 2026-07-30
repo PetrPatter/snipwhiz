@@ -49,13 +49,33 @@
         <!-- Thin left rail: icon-only, per the approved design direction. -->
         <Border Grid.Column="0" Background="{StaticResource SurfaceRaised}"
                 CornerRadius="14" Margin="0,0,0,0" Padding="8,10" VerticalAlignment="Stretch">
-            <StackPanel VerticalAlignment="Top">
+            <!-- Named because the code-behind enumerates these rather than keeping a
+                 second hand-written list of them to forget to update. -->
+            <StackPanel x:Name="ToolRail" VerticalAlignment="Top">
                 <ToggleButton x:Name="SelectToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE8B0;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Select  (V)" IsChecked="True"/>
                 <ToggleButton x:Name="RectToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE739;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Rectangle  (R)"/>
+                <ToggleButton x:Name="EllipseToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xEA3A;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Ellipse  (E)"/>
+                <ToggleButton x:Name="LineToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE738;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Line  (L)"/>
+                <ToggleButton x:Name="ArrowToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE72A;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Arrow  (A)"/>
+                <ToggleButton x:Name="HighlightToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE7E6;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Highlight  (H)"/>
+                <ToggleButton x:Name="TextToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Text  (T)"/>
+                <ToggleButton x:Name="CropToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE7A8;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Crop  (C)"/>
             </StackPanel>
         </Border>
 
@@ -65,9 +85,46 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{StaticResource Surface}" CornerRadius="14" ClipToBounds="True">
-                <editor:CanvasHost x:Name="Canvas"/>
-            </Border>
+            <Grid Grid.Row="0">
+                <Border Background="{StaticResource Surface}" CornerRadius="14" ClipToBounds="True">
+                    <editor:CanvasHost x:Name="Canvas"/>
+                </Border>
+
+                <!-- The contextual pill, floating over the canvas rather than in a
+                     permanent side panel. Its own layer so it is not clipped into
+                     the canvas border and so hit-testing reaches it first. -->
+                <!-- No Background: a Canvas with none hit-tests only its children, so
+                     drawing on the surface underneath still works everywhere except
+                     on the pill itself. Set it to Transparent and the layer swallows
+                     every press meant for the canvas. -->
+                <Canvas x:Name="PillLayer">
+                    <Border x:Name="StylePill" Visibility="Collapsed"
+                            Background="#F226241F" CornerRadius="11"
+                            BorderBrush="#2EF5F2EC" BorderThickness="1"
+                            Padding="10,7">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.5" Color="#000000"/>
+                        </Border.Effect>
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Filled in code: seven near-identical XAML blocks is
+                                 seven places to edit the palette. -->
+                            <StackPanel x:Name="SwatchRow" Orientation="Horizontal"
+                                        VerticalAlignment="Center"/>
+                            <Border Width="1" Background="#2EF5F2EC" Margin="9,2,9,2"/>
+                            <TextBlock Text="&#xE76D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                       Foreground="{StaticResource InkMuted}"
+                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <Slider x:Name="WidthSlider" Width="88" VerticalAlignment="Center"
+                                    Minimum="0" Maximum="24"
+                                    IsSnapToTickEnabled="True" TickFrequency="1"
+                                    ToolTip="Stroke width"/>
+                            <TextBlock x:Name="WidthText" Width="20" TextAlignment="Right"
+                                       Foreground="{StaticResource Ink}" FontSize="11"
+                                       VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Canvas>
+            </Grid>
 
             <Grid Grid.Row="1" Margin="6,10,6,0">
                 <TextBlock x:Name="StatusText"

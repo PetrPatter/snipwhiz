@@ -21,6 +21,13 @@ public partial class App : Application
     private HotkeyService? _hotkeys;
     private CaptureStore? _store;
     private CapturePipeline? _pipeline;
+
+    /// <summary>
+    /// The single instance everything shares — the tray writes autostart into it,
+    /// the editor's style pill writes tool defaults. Two loaded copies would each
+    /// save their own stale view of the other's fields.
+    /// </summary>
+    private Settings? _settings;
     private readonly BitBltGrabber _grabber = new();
     // Overridable so verification runs against a throwaway library instead of the
     // user's real captures. Unset in normal use.
@@ -57,7 +64,7 @@ public partial class App : Application
 
         try
         {
-            var settings = Settings.Load(_root);
+            var settings = _settings = Settings.Load(_root);
             _store = new CaptureStore(_root);
             _pipeline = new CapturePipeline(_store);
 
@@ -87,6 +94,20 @@ public partial class App : Application
             if (Diagnostics.CanvasVerification.IsEnabled)
             {
                 Diagnostics.CanvasVerification.RunIfRequested();
+                return;
+            }
+
+            // Never returns; its driver kills this process. Ahead of the other gates
+            // because it must not stand up a window or touch the library.
+            if (Diagnostics.SettingsWriteVerification.IsEnabled)
+            {
+                Diagnostics.SettingsWriteVerification.RunIfRequested(_root);
+                return;
+            }
+
+            if (Diagnostics.TextSeamVerification.IsEnabled)
+            {
+                Diagnostics.TextSeamVerification.RunIfRequested();
                 return;
             }
 
@@ -159,7 +180,7 @@ public partial class App : Application
         _thumbnails ??= new ThumbnailCache(_store!);
         if (_library is null)
         {
-            _library = new LibraryWindow(_store!, _thumbnails);
+            _library = new LibraryWindow(_store!, _thumbnails, _settings!, _root);
             _library.EditRequested += ShowEditor;
 
             _saves = new Editor.SavePipeline(_store!, _thumbnails, Dispatcher);

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using Snipwhiz.Core.Annotations;
 using Snipwhiz.Core.Scene;
+using Snipwhiz.Core.Storage;
 
 namespace Snipwhiz.Core.Project;
 
@@ -59,25 +60,12 @@ public static class ProjectStore
         }
     }
 
-    public static void SaveText(string path, string json)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-
-        // Written beside the target and moved into place. A crash part-way must not
-        // leave a truncated project that parses as an empty scene — losing the
-        // annotations is the one failure this format exists to prevent.
-        var temp = $"{path}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            File.WriteAllText(temp, json);
-            File.Move(temp, path, overwrite: true);
-        }
-        catch
-        {
-            try { File.Delete(temp); } catch (IOException) { }
-            throw;
-        }
-    }
+    /// <summary>
+    /// Atomic, because a crash part-way must not leave a truncated project that
+    /// parses as an empty scene — losing the annotations is the one failure this
+    /// format exists to prevent.
+    /// </summary>
+    public static void SaveText(string path, string json) => AtomicFile.WriteAllText(path, json);
 
     public static SceneDocument Load(string path)
     {
@@ -143,9 +131,23 @@ public static class ProjectStore
         w.WriteStartObject("geometry");
         switch (a)
         {
+            // Covers HighlightAnnotation too — it is a rectangle, same geometry.
             case RectangleAnnotation r:
                 w.WriteNumber("width", r.Size.Width);
                 w.WriteNumber("height", r.Size.Height);
+                break;
+            case EllipseAnnotation e:
+                w.WriteNumber("width", e.Size.Width);
+                w.WriteNumber("height", e.Size.Height);
+                break;
+            // Covers ArrowAnnotation too — it is a line, and stores the same vector.
+            case LineAnnotation line:
+                w.WriteNumber("dx", line.Delta.X);
+                w.WriteNumber("dy", line.Delta.Y);
+                break;
+            case TextAnnotation text:
+                w.WriteString("text", text.Text);
+                w.WriteNumber("fontSize", text.FontSize);
                 break;
             default:
                 throw new ProjectFormatException($"No serializer for {a.GetType().Name}.");
@@ -155,9 +157,23 @@ public static class ProjectStore
         w.WriteEndObject();
     }
 
-    private static string TagOf(Annotation a) => a switch
+    /// <summary>
+    /// The name a type is stored under — and, because it is the same identity, the
+    /// key its remembered tool defaults live under in settings. A second name table
+    /// would be a second thing to keep in step.
+    /// </summary>
+    public static string TagOf(Annotation a) => a switch
     {
+        HighlightAnnotation => "highlight",
+        TextAnnotation => "text",
         RectangleAnnotation => "rectangle",
+        EllipseAnnotation => "ellipse",
+        // Before the line arm, not after: an arrow is a LineAnnotation and the first
+        // matching pattern wins. Putting it second does not save arrows as lines —
+        // it does not compile (CS8510, unreachable pattern), which is the right
+        // place for this to be caught.
+        ArrowAnnotation => "arrow",
+        LineAnnotation => "line",
         _ => throw new ProjectFormatException($"No type tag for {a.GetType().Name}."),
     };
 
@@ -195,7 +211,7 @@ public static class ProjectStore
         var id = e.GetProperty("id").GetGuid();
         var z = e.GetProperty("z").GetInt32();
 
-        if (tag != "rectangle")
+        if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -203,16 +219,45 @@ public static class ProjectStore
         }
 
         var geometry = e.GetProperty("geometry");
-        return new RectangleAnnotation
+
+        return tag switch
         {
-            Id = id,
-            ZIndex = z,
-            Transform = transform,
-            Style = style,
-            Size = new Size(geometry.GetProperty("width").GetDouble(),
-                            geometry.GetProperty("height").GetDouble()),
+            "rectangle" => new RectangleAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            // Style comes from the file, not from HighlightAnnotation's default — a
+            // highlight the user recoloured must reopen the colour they chose.
+            "highlight" => new HighlightAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "ellipse" => new EllipseAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "text" => new TextAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style,
+                Text = geometry.GetProperty("text").GetString() ?? "",
+                FontSize = geometry.GetProperty("fontSize").GetDouble(),
+            },
+            "line" => new LineAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Delta = ReadDelta(geometry),
+            },
+            _ => new ArrowAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Delta = ReadDelta(geometry),
+            },
         };
     }
+
+    private static Vector ReadDelta(JsonElement geometry) =>
+        new(geometry.GetProperty("dx").GetDouble(), geometry.GetProperty("dy").GetDouble());
+
+    private static Size ReadSize(JsonElement geometry) =>
+        new(geometry.GetProperty("width").GetDouble(), geometry.GetProperty("height").GetDouble());
 
     private static Matrix ReadMatrix(JsonElement e)
     {
@@ -262,18 +307,9 @@ public static class ProjectStore
         return new Rect(v[0], v[1], v[2], v[3]);
     }
 
-    /// <summary>Alpha is omitted when opaque, which is nearly always, so the common case reads as a familiar CSS colour.</summary>
-    private static string Hex(Color c) =>
-        c.A == 255 ? $"#{c.R:X2}{c.G:X2}{c.B:X2}" : $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
+    // Colour text lives in ColourHex, shared with settings. FormatException from a
+    // bad colour is already wrapped as a ProjectFormatException by Load and Parse.
+    private static string Hex(Color c) => ColourHex.Write(c);
 
-    private static Color ParseHex(string? value)
-    {
-        var s = (value ?? "").TrimStart('#');
-        if (s.Length is not (6 or 8)) throw new ProjectFormatException($"'{value}' is not a colour.");
-
-        var n = uint.Parse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        return s.Length == 6
-            ? Color.FromRgb((byte)(n >> 16), (byte)(n >> 8), (byte)n)
-            : Color.FromArgb((byte)(n >> 24), (byte)(n >> 16), (byte)(n >> 8), (byte)n);
-    }
+    private static Color ParseHex(string? value) => ColourHex.Parse(value);
 }

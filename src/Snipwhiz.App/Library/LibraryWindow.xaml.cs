@@ -9,6 +9,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Snipwhiz.Core;
 using Snipwhiz.Core.Clipboard;
 using Snipwhiz.Core.Imaging;
 using Snipwhiz.Core.Scene;
@@ -31,10 +32,18 @@ public partial class LibraryWindow : Window
     private readonly ThumbnailCache _thumbnails;
     private readonly LibraryViewModel _model;
 
-    public LibraryWindow(CaptureStore store, ThumbnailCache thumbnails)
+    // Passed straight through to the editor's style pill. The one instance the app
+    // loaded at startup, not a second copy: two copies means whichever saves last
+    // writes its own stale view of everything else back over the file.
+    private readonly Settings _settings;
+    private readonly string _root;
+
+    public LibraryWindow(CaptureStore store, ThumbnailCache thumbnails, Settings settings, string root)
     {
         _store = store;
         _thumbnails = thumbnails;
+        _settings = settings;
+        _root = root;
         InitializeComponent();
 
         _model = new LibraryViewModel(store, thumbnails);
@@ -141,7 +150,7 @@ public partial class LibraryWindow : Window
     {
         if (_editor is null)
         {
-            _editor = new Editor.EditorView(_store);
+            _editor = new Editor.EditorView(_store, _settings, _root);
             _editor.ExitRequested += ShowLibraryScreen;
             _editor.SaveRequested += (r, d, s) => EditorSaveRequested?.Invoke(r, d, s);
             _editor.UrgentSaveRequested += (r, d) => EditorUrgentSaveRequested?.Invoke(r, d);

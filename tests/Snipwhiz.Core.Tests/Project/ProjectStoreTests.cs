@@ -82,6 +82,141 @@ public class ProjectStoreTests : IDisposable
         Assert.Null(ProjectStore.Load(path).Crop);
     }
 
+    [Fact]
+    public void An_ellipse_and_a_line_survive_a_round_trip()
+    {
+        var ellipse = new EllipseAnnotation
+        {
+            ZIndex = 1,
+            Size = new Size(180, 90),
+            Transform = new Matrix(1, 0, 0, 1, 200, 150),
+            Style = AnnotationStyle.Default with { Fill = Colors.Teal },
+        };
+
+        var line = new LineAnnotation
+        {
+            ZIndex = 2,
+            // Negative both ways: a format that stored bounds rather than a vector
+            // would come back pointing the other way.
+            Delta = new Vector(-140, -60),
+            Transform = new Matrix(1, 0, 0, 1, 400, 300),
+        };
+
+        var path = Path_("shapes.ssproj");
+        ProjectStore.Save(path, Scene(ellipse, line));
+        var loaded = ProjectStore.Load(path);
+
+        var loadedEllipse = Assert.IsType<EllipseAnnotation>(loaded.Annotations[0]);
+        Assert.Equal(ellipse.Id, loadedEllipse.Id);
+        Assert.Equal(new Size(180, 90), loadedEllipse.Size);
+        Assert.Equal(Colors.Teal, loadedEllipse.Style.Fill);
+
+        var loadedLine = Assert.IsType<LineAnnotation>(loaded.Annotations[1]);
+        Assert.Equal(line.Id, loadedLine.Id);
+        Assert.Equal(new Vector(-140, -60), loadedLine.Delta);
+        Assert.Equal(2, loadedLine.ZIndex);
+    }
+
+    /// <summary>
+    /// An arrow is a <see cref="LineAnnotation"/>, so a type switch that tests for a
+    /// line first matches it and writes it out as one. It would reopen without its
+    /// head and nothing would throw. <c>Assert.IsType</c> is exact-type, which is
+    /// what catches it.
+    /// </summary>
+    [Fact]
+    public void An_arrow_round_trips_as_an_arrow_and_not_as_a_line()
+    {
+        var arrow = new ArrowAnnotation
+        {
+            Delta = new Vector(-140, -60),
+            Transform = new Matrix(1, 0, 0, 1, 400, 300),
+            Style = AnnotationStyle.Default with { StrokeWidth = 8 },
+        };
+
+        var path = Path_("arrow.ssproj");
+        ProjectStore.Save(path, Scene(arrow));
+
+        Assert.Contains("\"arrow\"", File.ReadAllText(path));
+
+        var loaded = Assert.IsType<ArrowAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(arrow.Id, loaded.Id);
+        Assert.Equal(new Vector(-140, -60), loaded.Delta);
+        Assert.Equal(8, loaded.Style.StrokeWidth);
+    }
+
+    /// <summary>
+    /// The whole reason <see cref="HighlightAnnotation"/> exists as a type: it draws
+    /// exactly like a rectangle, so nothing else in the suite would notice it coming
+    /// back as one — and a highlight saved as a rectangle can never be recovered.
+    /// </summary>
+    [Fact]
+    public void A_highlight_round_trips_as_a_highlight_and_not_as_a_rectangle()
+    {
+        var highlight = new HighlightAnnotation
+        {
+            Size = new Size(220, 40),
+            Transform = new Matrix(1, 0, 0, 1, 300, 200),
+        };
+
+        var path = Path_("highlight.ssproj");
+        ProjectStore.Save(path, Scene(highlight));
+
+        var loaded = Assert.IsType<HighlightAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Size(220, 40), loaded.Size);
+    }
+
+    [Fact]
+    public void A_recoloured_highlight_reopens_the_colour_it_was_given()
+    {
+        // Not HighlightAnnotation.DefaultStyle: the constructor's default must not
+        // win over what is in the file, or every edit to a highlight is discarded.
+        var highlight = new HighlightAnnotation
+        {
+            Size = new Size(100, 30),
+            Style = HighlightAnnotation.DefaultStyle with { Fill = Colors.LimeGreen, Opacity = 0.6 },
+        };
+
+        var path = Path_("green-highlight.ssproj");
+        ProjectStore.Save(path, Scene(highlight));
+        var loaded = (HighlightAnnotation)ProjectStore.Load(path).Annotations.Single();
+
+        Assert.Equal(Colors.LimeGreen, loaded.Style.Fill);
+        Assert.Equal(0.6, loaded.Style.Opacity);
+    }
+
+    [Fact]
+    public void Text_and_its_font_size_survive_a_round_trip()
+    {
+        var text = new TextAnnotation
+        {
+            Text = "Line one\nLine two — an em dash, \"quotes\" and a \\ backslash",
+            FontSize = 31.5,
+            Transform = new Matrix(1, 0, 0, 1, 120, 90),
+        };
+
+        var path = Path_("text.ssproj");
+        ProjectStore.Save(path, Scene(text));
+        var loaded = Assert.IsType<TextAnnotation>(ProjectStore.Load(path).Annotations.Single());
+
+        // The string is the geometry here, so anything the JSON writer mangles is a
+        // caption that comes back wrong rather than a shape that comes back wonky.
+        Assert.Equal(text.Text, loaded.Text);
+        Assert.Equal(31.5, loaded.FontSize);
+    }
+
+    [Fact]
+    public void A_text_annotation_being_edited_still_saves_its_words()
+    {
+        // IsBeingEdited suppresses drawing, not storing. If it ever reached the
+        // writer, saving while a caption was open would persist an empty plate.
+        var text = new TextAnnotation { Text = "still here", IsBeingEdited = true };
+
+        var path = Path_("editing.ssproj");
+        ProjectStore.Save(path, Scene(text));
+
+        Assert.Equal("still here", ((TextAnnotation)ProjectStore.Load(path).Annotations.Single()).Text);
+    }
+
     // ---- the golden file --------------------------------------------------
 
     /// <summary>
