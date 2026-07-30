@@ -147,12 +147,8 @@ public class CalloutTests
         callout.Tail = new Vector(0, 60);
         var before = Handles.ImagePosition(callout, HandleKind.Tail, rotateGap: 0);
 
-        var resized = Handles.Resize(callout, HandleKind.TopLeft, new Point(-120, -60));
-        callout.RestoreGeometry(
-            callout.Rebased(callout.GeometryForBounds(resized.Size), resized.LocalCentre));
-        callout.Transform = resized.Transform;
-
-        var after = Handles.ImagePosition(callout, HandleKind.Tail, rotateGap: 0);
+        var after = Handles.ImagePosition(Resize(callout, HandleKind.TopLeft, new Point(-120, -60)),
+            HandleKind.Tail, rotateGap: 0);
         Assert.Equal(before.X, after.X, precision: 6);
         Assert.Equal(before.Y, after.Y, precision: 6);
     }
@@ -167,12 +163,56 @@ public class CalloutTests
         var callout = Callout();
         callout.Tail = new Vector(0, 60);
 
-        var resized = Handles.Resize(
-            callout, HandleKind.TopLeft, new Point(-120, -60), aboutCentre: true);
-        callout.RestoreGeometry(
-            callout.Rebased(callout.GeometryForBounds(resized.Size), resized.LocalCentre));
+        Resize(callout, HandleKind.TopLeft, new Point(-120, -60), aboutCentre: true);
 
         Assert.Equal(new Vector(0, 60), callout.Tail);
+    }
+
+    /// <summary>
+    /// The anchor has to hold for a caption too, and it did not.
+    ///
+    /// <para><c>Handles.Resize</c> positions an object assuming its bounds will be
+    /// the size it was asked for. A callout answers a resize by changing font size,
+    /// so its width then comes from the glyphs and lands somewhere else — the anchor
+    /// was computed against bounds the object never had, and the bubble skated around
+    /// under the pointer. Reported by hand, after the tail fix.</para>
+    /// </summary>
+    [Theory]
+    [InlineData(HandleKind.TopLeft)]
+    [InlineData(HandleKind.TopRight)]
+    [InlineData(HandleKind.BottomLeft)]
+    [InlineData(HandleKind.BottomRight)]
+    public void The_opposite_corner_stays_put_while_a_callout_is_resized(HandleKind handle)
+    {
+        var callout = Callout("A caption of some length");
+        var opposite = Handles.Opposite(handle);
+        var anchor = Handles.ImagePosition(callout, opposite, rotateGap: 0);
+
+        Resize(callout, handle, new Point(-200, -140));
+
+        var after = Handles.ImagePosition(callout, opposite, rotateGap: 0);
+        Assert.Equal(anchor.X, after.X, precision: 6);
+        Assert.Equal(anchor.Y, after.Y, precision: 6);
+    }
+
+    /// <summary>
+    /// The whole resize gesture as <c>SelectTool</c> performs it, which is the part
+    /// the first version of these tests skipped: it called <c>GeometryForBounds</c>
+    /// alone and never applied the transform that comes with it, so nothing it
+    /// asserted could see the object move.
+    /// </summary>
+    private static Annotation Resize(
+        Annotation annotation, HandleKind handle, Point local, bool aboutCentre = false)
+    {
+        var startTransform = annotation.Transform;
+        var anchor = Handles.ImagePosition(annotation, Handles.Opposite(handle), 0);
+
+        var resized = Handles.Resize(annotation, handle, local, aboutCentre: aboutCentre);
+        var (_, transform) = Handles.Settle(
+            annotation, startTransform, resized, handle, anchor, aboutCentre);
+
+        annotation.Transform = transform;
+        return annotation;
     }
 
     /// <summary>

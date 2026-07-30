@@ -163,6 +163,77 @@ public static class Handles
         return new Resized(new Size(width, height), transform, new Vector(centre.X, centre.Y));
     }
 
+    /// <summary>The transform that puts a local point of an object onto an image point.</summary>
+    public static Matrix Anchored(Matrix transform, Point local, Point image)
+    {
+        // Rotation only, so the local point is mapped by the object's orientation
+        // and not by wherever it currently sits.
+        var rotation = transform;
+        rotation.OffsetX = 0;
+        rotation.OffsetY = 0;
+
+        var mapped = rotation.Transform(local);
+        transform.OffsetX = image.X - mapped.X;
+        transform.OffsetY = image.Y - mapped.Y;
+        return transform;
+    }
+
+    /// <summary>
+    /// Settles a resize onto an object: gives it the new geometry, then finds the
+    /// transform that keeps the anchor where it was, then rebases anything the object
+    /// measures from its own origin.
+    /// </summary>
+    ///
+    /// <remarks>
+    /// <para><b><see cref="Resize"/>'s transform is a prediction, and for some types
+    /// it is wrong.</b> It positions the object assuming its bounds will be exactly
+    /// the size it was asked for. That holds for a rectangle. It does not hold for
+    /// text or a callout, which answer a resize by changing <i>font size</i> — the
+    /// width then comes from the glyphs and lands somewhere else entirely. The
+    /// anchor was therefore computed against bounds the object never had, and a
+    /// caption being resized skated around under the pointer instead of growing from
+    /// its opposite corner.</para>
+    ///
+    /// <para>So the geometry is applied <b>first</b> and the transform derived from
+    /// the bounds that actually resulted. That is why this mutates rather than
+    /// returning a plan: there is no way to ask an annotation how big it would be
+    /// without telling it.</para>
+    ///
+    /// <para>With <paramref name="aboutCentre"/> there is nothing to anchor — the
+    /// centre is staying put by definition — so the predicted transform is already
+    /// right.</para>
+    /// </remarks>
+    ///
+    /// <param name="anchorImage">
+    /// Where the opposite handle was in image space when the gesture began. Captured
+    /// once at the start, not recomputed per frame, or it chases itself.
+    /// </param>
+    public static (GeometryState Geometry, Matrix Transform) Settle(
+        Annotation annotation, Matrix startTransform, Resized resized,
+        HandleKind handle, Point anchorImage, bool aboutCentre)
+    {
+        var geometry = annotation.GeometryForBounds(resized.Size);
+        annotation.RestoreGeometry(geometry);
+
+        var transform = aboutCentre
+            ? resized.Transform
+            : Anchored(resized.Transform, LocalPosition(annotation, Opposite(handle), 0), anchorImage);
+
+        // The true origin shift, read back from where the object actually ended up
+        // rather than from Resize's prediction — the same reason as above, and the
+        // callout tail depends on it being the real one.
+        var inverse = startTransform;
+        if (inverse.HasInverse)
+        {
+            inverse.Invert();
+            var origin = inverse.Transform(new Point(transform.OffsetX, transform.OffsetY));
+            geometry = annotation.Rebased(geometry, new Vector(origin.X, origin.Y));
+            annotation.RestoreGeometry(geometry);
+        }
+
+        return (geometry, transform);
+    }
+
     /// <summary>
     /// The transform that turns an object to face an image-space point, about its
     /// own centre.

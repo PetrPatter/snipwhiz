@@ -28,6 +28,14 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
     private Matrix _startTransform;
     private GeometryState? _startGeometry;
 
+    /// <summary>
+    /// Where the handle opposite the one being dragged sat when the gesture began.
+    ///
+    /// <para>Captured once. Recomputed each frame it would chase the object it is
+    /// supposed to be pinning.</para>
+    /// </summary>
+    private Point _anchorImage;
+
     public Cursor Cursor => Cursors.Arrow;
 
     public void OnPress(Point image, ModifierKeys modifiers)
@@ -53,6 +61,8 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
 
                 Begin(canvas.Selection[0], gesture, image);
                 _handle = handle;
+                _anchorImage = Handles.ImagePosition(
+                    canvas.Selection[0], Handles.Opposite(handle), 0);
                 return;
             }
         }
@@ -175,18 +185,17 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
             preserveAspect: (modifiers & ModifierKeys.Shift) != 0,
             aboutCentre: (modifiers & ModifierKeys.Alt) != 0);
 
-        // The shape decides what its bounds mean. This used to build a rectangle's
-        // state unconditionally, which would have thrown the first time anyone
-        // resized an ellipse — and silently flipped a line end for end.
-        //
-        // Rebased afterwards because a corner drag anchors the opposite corner and
-        // therefore slides the object's own origin. Nothing whose geometry is an
-        // extent notices; a callout's tail, which is a point measured from that
-        // origin, stops pointing at what it was pointing at.
-        var geometry = _target.Rebased(_target.GeometryForBounds(resized.Size), resized.LocalCentre);
+        // The shape decides what its bounds mean, and then Settle asks it how big it
+        // actually became. Resize's transform is a prediction that only holds for
+        // objects whose bounds are the size they were given — a caption's are not,
+        // and it skated around under the pointer until this was derived from the
+        // result instead.
+        var (geometry, transform) = Handles.Settle(
+            _target, _startTransform, resized, _handle, _anchorImage,
+            aboutCentre: (modifiers & ModifierKeys.Alt) != 0);
 
         undo.Apply(new ResizeAnnotation(
-            _target, _startGeometry, _startTransform, geometry, resized.Transform));
+            _target, _startGeometry, _startTransform, geometry, transform));
 
         canvas.Invalidate(_target);
         canvas.RefreshOverlay();
