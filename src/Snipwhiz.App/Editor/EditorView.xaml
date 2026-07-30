@@ -73,6 +73,9 @@
                 <ToggleButton x:Name="TextToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Text  (T)"/>
+                <ToggleButton x:Name="SpotlightToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE706;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Spotlight  (S)"/>
                 <ToggleButton x:Name="BlurToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE890;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Blur  (B)"/>

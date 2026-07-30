@@ -181,6 +181,11 @@ public static class ProjectStore
         // Also before the rectangle arm, and for the same reason as arrow below.
         PixelateAnnotation => "pixelate",
         BlurAnnotation => "blur",
+        // Its geometry really is a rectangle's — the dim strength lives in the
+        // style's opacity — so it needs no arm in the geometry switch below. Only
+        // the tag has to come first, or a spotlight reopens as an opaque black box
+        // over the whole picture.
+        SpotlightAnnotation => "spotlight",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
         // Before the line arm, not after: an arrow is a LineAnnotation and the first
@@ -227,7 +232,7 @@ public static class ProjectStore
         var z = e.GetProperty("z").GetInt32();
 
         if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"
-            or "pixelate" or "blur"))
+            or "pixelate" or "blur" or "spotlight"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -252,6 +257,12 @@ public static class ProjectStore
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
                 BlockSize = geometry.GetProperty("blockSize").GetDouble(),
+            },
+            // Style from the file, not from DefaultStyle: a spotlight the user
+            // dimmed further must reopen at the strength they chose.
+            "spotlight" => new SpotlightAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
             },
             "blur" => new BlurAnnotation
             {

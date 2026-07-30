@@ -191,6 +191,25 @@ public class ProjectStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A spotlight's geometry really is a rectangle's, so the only thing standing
+    /// between it and reopening as an opaque black box over the whole picture is its
+    /// type tag.
+    /// </summary>
+    [Fact]
+    public void A_spotlight_round_trips_as_a_spotlight_and_not_as_a_rectangle()
+    {
+        var spotlight = new SpotlightAnnotation { Size = new Size(160, 120) };
+        spotlight.SizeControl = 75;
+
+        var path = Path_("spotlight.ssproj");
+        ProjectStore.Save(path, Scene(spotlight));
+
+        var loaded = Assert.IsType<SpotlightAnnotation>(ProjectStore.Load(path).Annotations.Single());
+        Assert.Equal(new Size(160, 120), loaded.Size);
+        Assert.Equal(75, loaded.SizeControl);
+    }
+
+    /// <summary>
     /// The whole reason <see cref="HighlightAnnotation"/> exists as a type: it draws
     /// exactly like a rectangle, so nothing else in the suite would notice it coming
     /// back as one — and a highlight saved as a rectangle can never be recovered.

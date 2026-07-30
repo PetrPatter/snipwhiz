@@ -203,6 +203,15 @@ internal static class WysiwygVerification
         blur.Fit(new Point(70, 60), new Point(210, 150));
         document.Annotations.Add(blur);
 
+        // A spotlight over everything, at a deliberately mild dim. It is the only
+        // annotation that paints most of the picture, so it covers whether a
+        // full-canvas geometry lands identically in both paths — and a strong dim
+        // here would flatten the channel deltas the control below depends on.
+        var spotlight = new SpotlightAnnotation { ZIndex = 9 };
+        spotlight.Fit(new Point(120, 100), new Point(400, 260));
+        spotlight.SizeControl = 30;
+        document.Annotations.Add(spotlight);
+
         return document;
     }
 
