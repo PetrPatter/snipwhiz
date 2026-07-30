@@ -129,6 +129,65 @@ public class CalloutTests
         Assert.True(callout.FontSize > 20, "resizing should still change the font size");
     }
 
+    /// <summary>
+    /// The one above was not enough, and a hand check found it. It asserts the tail
+    /// <i>survives</i> a resize without asserting that it still aims anywhere in
+    /// particular — and dragging a corner anchors the opposite corner, which slides
+    /// the bubble's centre. The tail is measured from that centre, so it rode along
+    /// and stopped pointing at what it had been pointing at.
+    ///
+    /// <para>This models the whole gesture the way <c>SelectTool</c> performs it,
+    /// which is what the first test skipped: it called <c>GeometryForBounds</c> alone
+    /// and never applied the transform that came with it.</para>
+    /// </summary>
+    [Fact]
+    public void Resizing_from_a_corner_leaves_the_tip_where_it_was_pointing()
+    {
+        var callout = Callout();
+        callout.Tail = new Vector(0, 60);
+        var before = Handles.ImagePosition(callout, HandleKind.Tail, rotateGap: 0);
+
+        var resized = Handles.Resize(callout, HandleKind.TopLeft, new Point(-120, -60));
+        callout.RestoreGeometry(
+            callout.Rebased(callout.GeometryForBounds(resized.Size), resized.LocalCentre));
+        callout.Transform = resized.Transform;
+
+        var after = Handles.ImagePosition(callout, HandleKind.Tail, rotateGap: 0);
+        Assert.Equal(before.X, after.X, precision: 6);
+        Assert.Equal(before.Y, after.Y, precision: 6);
+    }
+
+    /// <summary>
+    /// Resizing about the centre moves no origin, so there is nothing to rebase and
+    /// the tail must not be nudged by a correction that does not apply.
+    /// </summary>
+    [Fact]
+    public void Resizing_about_the_centre_leaves_the_tail_alone()
+    {
+        var callout = Callout();
+        callout.Tail = new Vector(0, 60);
+
+        var resized = Handles.Resize(
+            callout, HandleKind.TopLeft, new Point(-120, -60), aboutCentre: true);
+        callout.RestoreGeometry(
+            callout.Rebased(callout.GeometryForBounds(resized.Size), resized.LocalCentre));
+
+        Assert.Equal(new Vector(0, 60), callout.Tail);
+    }
+
+    /// <summary>
+    /// And nothing else is disturbed by the rebase: a shape's geometry is an extent
+    /// and does not care where its centre went.
+    /// </summary>
+    [Fact]
+    public void Rebasing_does_nothing_to_an_ordinary_shape()
+    {
+        var rectangle = new RectangleAnnotation { Size = new Size(40, 30) };
+        var state = rectangle.GeometryForBounds(new Size(80, 60));
+
+        Assert.Same(state, rectangle.Rebased(state, new Vector(17, -9)));
+    }
+
     [Fact]
     public void The_tail_can_be_grabbed()
     {

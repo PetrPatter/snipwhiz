@@ -173,6 +173,27 @@ public abstract class Annotation
     public virtual GeometryState? MoveControlPoint(HandleKind kind, Point local) => null;
 
     /// <summary>
+    /// Fixes up anything stored in local coordinates after a resize moved this
+    /// object's own frame out from under it.
+    /// </summary>
+    ///
+    /// <param name="localShift">
+    /// <see cref="Handles.Resized.LocalCentre"/> — where the new origin sits in the
+    /// old frame.
+    /// </param>
+    ///
+    /// <remarks>
+    /// Identity for everything whose geometry is a size, which is almost everything:
+    /// a rectangle's width does not care where its centre went. It matters for a
+    /// callout's tail, which is a point rather than an extent — dragging a corner
+    /// anchors the opposite one and slides the centre, and a tail that rode along
+    /// stopped pointing at what it was pointing at. Found by hand after the tests
+    /// checked that the tail <i>survived</i> a resize without checking that it still
+    /// aimed anywhere in particular.
+    /// </remarks>
+    public virtual GeometryState Rebased(GeometryState state, Vector localShift) => state;
+
+    /// <summary>
     /// Shapes this object to span two image-space points, unrotated.
     ///
     /// <para>What a create-by-drag gesture means, per shape: a box for a rectangle,

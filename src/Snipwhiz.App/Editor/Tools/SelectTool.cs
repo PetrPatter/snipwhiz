@@ -178,9 +178,15 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
         // The shape decides what its bounds mean. This used to build a rectangle's
         // state unconditionally, which would have thrown the first time anyone
         // resized an ellipse — and silently flipped a line end for end.
+        //
+        // Rebased afterwards because a corner drag anchors the opposite corner and
+        // therefore slides the object's own origin. Nothing whose geometry is an
+        // extent notices; a callout's tail, which is a point measured from that
+        // origin, stops pointing at what it was pointing at.
+        var geometry = _target.Rebased(_target.GeometryForBounds(resized.Size), resized.LocalCentre);
+
         undo.Apply(new ResizeAnnotation(
-            _target, _startGeometry, _startTransform,
-            _target.GeometryForBounds(resized.Size), resized.Transform));
+            _target, _startGeometry, _startTransform, geometry, resized.Transform));
 
         canvas.Invalidate(_target);
         canvas.RefreshOverlay();

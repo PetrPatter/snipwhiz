@@ -52,15 +52,31 @@ public sealed class CalloutAnnotation : TextAnnotation
     }
 
     /// <summary>
-    /// Resizing changes the font size, exactly as text does — and carries the tail
-    /// through unchanged, so a callout does not lose what it was pointing at the
-    /// first time someone drags a corner.
+    /// Resizing changes the font size, exactly as text does, and carries the tail
+    /// through unchanged.
+    ///
+    /// <para>Unchanged <i>here</i> is not the same as unmoved on screen: dragging a
+    /// corner anchors the opposite one and slides the bubble's centre, and the tail
+    /// is measured from that centre. <see cref="Rebased"/> is what takes the slide
+    /// back out.</para>
     /// </summary>
     public override GeometryState GeometryForBounds(Size size)
     {
         var resized = (TextGeometryState)base.GeometryForBounds(size);
         return new CalloutGeometryState(resized.Text, resized.FontSize, Tail);
     }
+
+    /// <summary>
+    /// Keeps the tip where it was pointing while the bubble grows away from it.
+    ///
+    /// <para>The new origin sits at <paramref name="localShift"/> in the old frame,
+    /// so everything measured from the old origin is that much further away in the
+    /// new one. Subtracting it is the whole fix.</para>
+    /// </summary>
+    public override GeometryState Rebased(GeometryState state, Vector localShift) =>
+        state is CalloutGeometryState callout
+            ? callout with { Tail = callout.Tail - localShift }
+            : state;
 
     /// <summary>
     /// The bubble and the tail as one geometry.

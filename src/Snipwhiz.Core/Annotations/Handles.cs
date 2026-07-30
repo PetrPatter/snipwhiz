@@ -75,7 +75,13 @@ public static class Handles
         annotation.Transform.Transform(LocalPosition(annotation, kind, rotateGap));
 
     /// <summary>The result of a resize: a new shape, and the transform that keeps it in place.</summary>
-    public readonly record struct Resized(Size Size, Matrix Transform);
+    /// <param name="LocalCentre">
+    /// Where the object's new origin sits in its <b>old</b> local frame — non-zero
+    /// whenever the anchor is a corner rather than the centre. Anything the object
+    /// stores in local coordinates has moved by exactly this much and has to be
+    /// rebased, which is what <see cref="Annotation.Rebased"/> is for.
+    /// </param>
+    public readonly record struct Resized(Size Size, Matrix Transform, Vector LocalCentre);
 
     /// <summary>
     /// Drags one handle to a point, given in the object's local space.
@@ -154,7 +160,7 @@ public static class Handles
         transform.OffsetX = imageCentre.X;
         transform.OffsetY = imageCentre.Y;
 
-        return new Resized(new Size(width, height), transform);
+        return new Resized(new Size(width, height), transform, new Vector(centre.X, centre.Y));
     }
 
     /// <summary>
