@@ -191,6 +191,34 @@ public class ProjectStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A step badge's number is its position among the steps, so the file must not
+    /// carry one. A file with both has two answers, and the stored one wins on
+    /// reopen — which is how a document that renumbers correctly all session comes
+    /// back tomorrow reading 1, 3, 4, 5.
+    /// </summary>
+    [Fact]
+    public void A_step_badge_round_trips_without_storing_its_number()
+    {
+        var first = new StepAnnotation { Diameter = 44 };
+        var second = new StepAnnotation { Diameter = 44 };
+        var third = new StepAnnotation { Diameter = 44 };
+
+        var path = Path_("steps.ssproj");
+        var document = Scene(first, second, third);
+        document.NumberSteps();
+        ProjectStore.Save(path, document);
+
+        Assert.DoesNotContain("number", File.ReadAllText(path));
+
+        var reopened = ProjectStore.Load(path);
+        var loaded = reopened.Annotations.OfType<StepAnnotation>().ToList();
+        reopened.NumberSteps();
+
+        Assert.Equal([1, 2, 3], loaded.Select(s => s.Number));
+        Assert.Equal(44, loaded[0].Diameter);
+    }
+
+    /// <summary>
     /// The source centre is absolute, so a magnifier dragged away from its subject
     /// must reopen still pointing at the subject. Stored relative to the lens it
     /// would reopen pointing at itself, which renders as a bordered copy of whatever

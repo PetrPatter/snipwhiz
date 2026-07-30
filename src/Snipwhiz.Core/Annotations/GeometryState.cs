@@ -50,5 +50,12 @@ public sealed record BlurGeometryState(Size Size, double Radius) : GeometryState
 /// </summary>
 public sealed record MagnifyGeometryState(Size Size, double Zoom, Point SourceCentre) : GeometryState;
 
+/// <summary>
+/// A step badge is one number wide — its diameter. What it <i>reads</i> is not here
+/// and is not anywhere: the number is the object's position among the steps, so
+/// there is nothing about it for undo to restore.
+/// </summary>
+public sealed record StepGeometryState(double Diameter) : GeometryState;
+
 /// <summary>Carried by an annotation this build cannot interpret, and never edited.</summary>
 public sealed record OpaqueGeometryState : GeometryState;

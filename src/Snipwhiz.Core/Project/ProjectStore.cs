@@ -138,6 +138,12 @@ public static class ProjectStore
                 w.WriteNumber("height", p.Size.Height);
                 w.WriteNumber("blockSize", p.BlockSize);
                 break;
+            // Diameter only. The number it reads is its position among the steps and
+            // is deliberately not written: a file that carried both would have two
+            // answers, and the stored one would win on reopen.
+            case StepAnnotation step:
+                w.WriteNumber("diameter", step.Diameter);
+                break;
             case MagnifyAnnotation magnify:
                 w.WriteNumber("width", magnify.Size.Width);
                 w.WriteNumber("height", magnify.Size.Height);
@@ -196,6 +202,7 @@ public static class ProjectStore
         // over the whole picture.
         SpotlightAnnotation => "spotlight",
         MagnifyAnnotation => "magnify",
+        StepAnnotation => "step",
         RectangleAnnotation => "rectangle",
         EllipseAnnotation => "ellipse",
         // Before the line arm, not after: an arrow is a LineAnnotation and the first
@@ -242,7 +249,7 @@ public static class ProjectStore
         var z = e.GetProperty("z").GetInt32();
 
         if (tag is not ("rectangle" or "highlight" or "ellipse" or "line" or "arrow" or "text"
-            or "pixelate" or "blur" or "spotlight" or "magnify"))
+            or "pixelate" or "blur" or "spotlight" or "magnify" or "step"))
         {
             // Clone: the JsonDocument this came from is disposed before the caller
             // ever touches it.
@@ -273,6 +280,11 @@ public static class ProjectStore
             "spotlight" => new SpotlightAnnotation
             {
                 Id = id, ZIndex = z, Transform = transform, Style = style, Size = ReadSize(geometry),
+            },
+            "step" => new StepAnnotation
+            {
+                Id = id, ZIndex = z, Transform = transform, Style = style,
+                Diameter = geometry.GetProperty("diameter").GetDouble(),
             },
             "magnify" => new MagnifyAnnotation
             {

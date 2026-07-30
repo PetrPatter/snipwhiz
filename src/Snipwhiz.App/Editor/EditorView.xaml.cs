@@ -58,6 +58,7 @@ public partial class EditorView : UserControl
         ArrowToolButton.Click += (_, _) => UseShape(ArrowToolButton, () => new ArrowAnnotation());
         HighlightToolButton.Click += (_, _) => UseShape(HighlightToolButton, () => new HighlightAnnotation());
         TextToolButton.Click += (_, _) => UseShape(TextToolButton, () => new TextAnnotation());
+        StepToolButton.Click += (_, _) => UseShape(StepToolButton, () => new StepAnnotation());
         MagnifyToolButton.Click += (_, _) => UseShape(MagnifyToolButton, () => new MagnifyAnnotation());
         SpotlightToolButton.Click += (_, _) => UseShape(SpotlightToolButton, () => new SpotlightAnnotation());
         BlurToolButton.Click += (_, _) => UseShape(BlurToolButton, () => new BlurAnnotation());
@@ -222,7 +223,9 @@ public partial class EditorView : UserControl
         // just drew is almost always the one you want to adjust.
         shape.Finished += created =>
         {
-            UseSelect();
+            // The object decides. A step badge is placed several in a row, so the
+            // tool stays; everything else is drawn once and then adjusted.
+            if (!created.PlacesRepeatedly) UseSelect();
             // A text object is created empty and is useless until it says something,
             // so placing one goes straight into typing rather than leaving a bare
             // plate selected and waiting to be discovered.
@@ -564,6 +567,7 @@ public partial class EditorView : UserControl
             case Key.A when !control: UseShape(ArrowToolButton, () => new ArrowAnnotation()); break;
             case Key.H when !control: UseShape(HighlightToolButton, () => new HighlightAnnotation()); break;
             case Key.T when !control: UseShape(TextToolButton, () => new TextAnnotation()); break;
+            case Key.N when !control: UseShape(StepToolButton, () => new StepAnnotation()); break;
             case Key.M when !control: UseShape(MagnifyToolButton, () => new MagnifyAnnotation()); break;
             case Key.S when !control: UseShape(SpotlightToolButton, () => new SpotlightAnnotation()); break;
             case Key.B when !control: UseShape(BlurToolButton, () => new BlurAnnotation()); break;

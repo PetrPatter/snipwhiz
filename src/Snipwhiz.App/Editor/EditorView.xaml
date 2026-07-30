@@ -73,6 +73,9 @@
                 <ToggleButton x:Name="TextToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Text  (T)"/>
+                <ToggleButton x:Name="StepToolButton" Style="{StaticResource ToolButton}"
+                              Content="&#xE8FD;" FontFamily="Segoe MDL2 Assets"
+                              ToolTip="Step number  (N)"/>
                 <ToggleButton x:Name="MagnifyToolButton" Style="{StaticResource ToolButton}"
                               Content="&#xE71E;" FontFamily="Segoe MDL2 Assets"
                               ToolTip="Magnify  (M)"/>

@@ -37,5 +37,29 @@ public sealed class SceneDocument
     public Rect? Crop { get; set; }
 
     /// <summary>Objects in paint order, back to front.</summary>
-    public IEnumerable<Annotation> InPaintOrder() => Annotations.OrderBy(a => a.ZIndex);
+    public IEnumerable<Annotation> InPaintOrder()
+    {
+        NumberSteps();
+        return Annotations.OrderBy(a => a.ZIndex);
+    }
+
+    /// <summary>
+    /// Stamps each step badge with its position among the steps.
+    ///
+    /// <para><b>Called from <see cref="InPaintOrder"/></b>, which is a query with a
+    /// side effect and is the deliberate choice. It is the one funnel every render
+    /// and every hit-test already goes through, so the number is correct at the only
+    /// moment it matters — when something is about to draw it. The alternative is
+    /// calling this from every command that adds, removes or reorders an annotation,
+    /// which is a list to keep in step and a bug the first time it is not. Idempotent
+    /// and O(steps).</para>
+    ///
+    /// <para>Order is the <b>document's</b> list, not z-order: bringing a badge to
+    /// the front should not renumber it.</para>
+    /// </summary>
+    public void NumberSteps()
+    {
+        var number = 0;
+        foreach (var step in Annotations.OfType<StepAnnotation>()) step.Number = ++number;
+    }
 }

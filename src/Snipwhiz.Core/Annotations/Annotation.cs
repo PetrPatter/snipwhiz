@@ -86,6 +86,15 @@ public abstract class Annotation
         set => Style = Style with { StrokeWidth = value };
     }
 
+    /// <summary>
+    /// Whether placing one of these leaves the tool active.
+    ///
+    /// <para>False for everything that is drawn once and then adjusted; true for step
+    /// numbers, where the point is to place several in a row. Asked of the type for
+    /// the same reason as everything else here.</para>
+    /// </summary>
+    public virtual bool PlacesRepeatedly => false;
+
     public virtual (double Min, double Max) SizeControlRange => (0, 24);
 
     public virtual string SizeControlLabel => "Stroke width";

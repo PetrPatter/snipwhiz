@@ -215,6 +215,17 @@ internal static class WysiwygVerification
         magnify.SourceCentre = new Point(140, 300);
         document.Annotations.Add(magnify);
 
+        // Three badges, so the gate covers a two-digit-capable glyph draw as well as
+        // the circle. Numbering happens in InPaintOrder, which both render paths go
+        // through — if it ever did not, these would draw different digits in the two
+        // images and this diff is what would say so.
+        for (var i = 0; i < 3; i++)
+        {
+            var step = new StepAnnotation { ZIndex = 11 + i, Diameter = 30 };
+            step.Fit(new Point(0, 0), new Point(80 + i * 46, 330));
+            document.Annotations.Add(step);
+        }
+
         var spotlight = new SpotlightAnnotation { ZIndex = 10 };
         spotlight.Fit(new Point(120, 100), new Point(400, 260));
         spotlight.SizeControl = 30;
