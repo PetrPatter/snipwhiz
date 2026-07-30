@@ -48,6 +48,20 @@ public sealed class CaptureStore : IDisposable
     public static string DefaultRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Snipwhiz");
 
+    /// <summary>
+    /// Where the library lives for this process. <c>SNIPWHIZ_ROOT</c> overrides it,
+    /// which is how every verification run stays away from the user's real
+    /// captures; unset in normal use.
+    ///
+    /// <para>A static rather than a line copied into each caller. Uninstall reads
+    /// this too, and a second opinion about where the library is would mean an
+    /// uninstaller that reports one location while the app writes to another.</para>
+    /// </summary>
+    public static string ResolveRoot() =>
+        Environment.GetEnvironmentVariable("SNIPWHIZ_ROOT") is { Length: > 0 } root
+            ? root
+            : DefaultRoot;
+
     public CaptureRecord Save(CroppedImage image, string sourceApp, string sourceTitle)
     {
         var id = _newId();

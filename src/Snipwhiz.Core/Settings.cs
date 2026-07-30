@@ -17,6 +17,14 @@ public sealed class Settings
     public bool PrintScreenTakenOver { get; set; }
 
     /// <summary>
+    /// Whether the first-run window has been shown. Absent from a settings file
+    /// written by an older build, so it reads as false and the window appears once
+    /// on upgrade too. That is the right answer rather than a bug: the hotkey is
+    /// worth telling an existing user about exactly once.
+    /// </summary>
+    public bool FirstRunShown { get; set; }
+
+    /// <summary>
     /// The style each tool draws with next time, keyed by
     /// <c>ProjectStore.TagOf</c>.
     ///

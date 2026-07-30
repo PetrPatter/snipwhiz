@@ -24,7 +24,12 @@ internal static class Program
     [STAThread]
     public static void Main()
     {
-        VelopackApp.Build().Run();
+        VelopackApp.Build()
+            // Velopack removes the shortcuts and the install directory on its own.
+            // The autostart value and the library are the two things it cannot know
+            // about; see Uninstall, including why this is not a message box.
+            .OnBeforeUninstallFastCallback(_ => Uninstall.Run())
+            .Run();
 
         var app = new App();
         app.InitializeComponent();

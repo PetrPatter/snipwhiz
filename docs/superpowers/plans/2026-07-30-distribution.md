@@ -114,29 +114,56 @@ SDK. Windows Sandbox covers this — free, built into Windows 11 Pro, and clean 
 
 **Files:** `src/Snipwhiz.App/FirstRun.xaml`, settings.
 
-- [ ] **Step 1: One window, not a wizard** — the hotkey, the autostart offer using
+- [x] **Step 1: One window, not a wizard** — the hotkey, the autostart offer using
   the consent checkbox that already exists, and a dismiss.
-- [ ] **Step 2: Shown once**, recorded in settings, never again.
-- [ ] **Step 3: The hotkey is the headline.** It is the one thing nobody can
+- [x] **Step 2: Shown once**, recorded in settings, never again.
+- [x] **Step 3: The hotkey is the headline.** It is the one thing nobody can
   discover on their own.
 
-**Verification:** install fresh, confirm it appears; restart, confirm it does not.
-**Negative control:** delete the settings flag and confirm it returns, so the check
-is testing the flag rather than a coincidence.
+**It absorbed a question rather than adding one.** A first launch already showed a
+"Snipwhiz is running" balloon *and* a separate PrintScreen message box. A third
+interruption would have been a wizard assembled by accident, which is the one thing
+step 1 says not to build — so the PrintScreen offer moved into this window and the
+balloon is suppressed on first run. The offer stays hidden unless the Snipping Tool
+actually holds the key, because offering to take a key nothing is using is a
+question with no meaning.
+
+Upgrades see it once too: the flag is absent from an older settings file, and the
+hotkey is worth saying exactly once to someone who has been using this all along.
+
+**Gate passed, including the control.** Fresh library shows it; restart does not;
+clearing the flag by hand brings it back, so the check reads the flag rather than a
+coincidence. Three tests cover the two things on the window that are not just text,
+and both were watched failing: a pre-ticked autostart box, and an unconditional
+PrintScreen offer. Autostart being unticked is a consent invariant rather than a
+preference, which is why it is a test and not a comment.
 
 ---
 
 ### Task D4: Uninstall
 
-- [ ] **Step 1: The app goes.** Shortcuts, install directory, autostart registry
-  value if it was ever set.
-- [ ] **Step 2: The library stays**, and the uninstaller says where it is.
+- [x] **Step 1: The app goes.** Shortcuts and install directory are Velopack's own
+  work. The autostart registry value is not — it goes in
+  `OnBeforeUninstallFastCallback`, because a stale `Run` entry pointing at a deleted
+  exe fails silently at every login forever and nothing on the machine explains why.
+- [x] **Step 2: The library stays**, and the uninstaller says where it is by opening
+  the folder — but only when there is something in it.
 
-**Verification:** install, take three captures, uninstall, confirm
-`%LOCALAPPDATA%\Snipwhiz\captures` and the database are intact and the app is gone.
-**Negative control:** an uninstall step that removes the data directory must fail
-this — deleting somebody's screenshots because they uninstalled an app is not a
-decision an uninstaller gets to make.
+**The hook runs on a 15-second fuse**, which ruled out the obvious implementation.
+Velopack calls `Environment.Exit` the moment the callback returns, terminates it at
+15 seconds, and exits `-1` if it throws — so a message box saying where the library
+is would hang the uninstaller behind a dialog nobody is looking at, and an
+unguarded registry call would fail the uninstall. Hence a spawned Explorer window,
+which outlives the process, and a catch around everything.
+
+**Gate passed, including the control.** The real hook, invoked the way Velopack
+invokes it, against a throwaway library: autostart value removed, five library
+files byte-identical across the uninstall. Adding `Directory.Delete(root)` made the
+gate fail, so it is reading the library rather than agreeing with itself.
+
+The gate touches the real `HKCU` Run value because that write has no test seam, so
+it saves and restores whatever was there. That turned out to matter — this machine
+had autostart genuinely set.
 
 ---
 

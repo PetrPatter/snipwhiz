@@ -1,7 +1,6 @@
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
-using Microsoft.Win32;
 using Snipwhiz.Core;
 
 namespace Snipwhiz.App;
@@ -13,9 +12,6 @@ namespace Snipwhiz.App;
 /// </summary>
 public sealed class TrayHost : IDisposable
 {
-    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string RunValue = "Snipwhiz";
-
     /// <summary>
     /// Read from the running assembly, never from a constant, so the About text
     /// cannot claim a version the binary is not. The informational version is the
@@ -29,8 +25,20 @@ public sealed class TrayHost : IDisposable
         ?? "unknown";
 
     private readonly NotifyIcon _icon;
+    private readonly ToolStripMenuItem _autostart;
     private readonly Settings _settings;
     private readonly string _root;
+
+    /// <summary>
+    /// Set by the first-run window, which offers the same choice this menu item
+    /// does. Routed through the menu item rather than around it so the registry
+    /// write keeps one owner and the tick stays honest about what is on disk.
+    /// </summary>
+    public bool Autostart
+    {
+        get => _autostart.Checked;
+        set => _autostart.Checked = value;
+    }
 
     public event Action? RegionRequested;
     public event Action? FullscreenRequested;
@@ -52,13 +60,13 @@ public sealed class TrayHost : IDisposable
         menu.Items.Add("Cancel capture", null, (_, _) => CancelRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
 
-        var autostart = new ToolStripMenuItem("Start with Windows")
+        _autostart = new ToolStripMenuItem("Start with Windows")
         {
             CheckOnClick = true,
             Checked = _settings.Autostart,
         };
-        autostart.CheckedChanged += (_, _) => SetAutostart(autostart.Checked);
-        menu.Items.Add(autostart);
+        _autostart.CheckedChanged += (_, _) => SetAutostart(_autostart.Checked);
+        menu.Items.Add(_autostart);
 
         menu.Items.Add($"About Snipwhiz {Version}", null, (_, _) => MessageBox.Show(
             $"Snipwhiz {Version}", "About Snipwhiz", MessageBoxButtons.OK, MessageBoxIcon.Information));
@@ -87,11 +95,7 @@ public sealed class TrayHost : IDisposable
 
     private void SetAutostart(bool enabled)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
-        if (key is null) return;
-
-        if (enabled) key.SetValue(RunValue, $"\"{Environment.ProcessPath}\"");
-        else key.DeleteValue(RunValue, throwOnMissingValue: false);
+        AutostartEntry.Set(enabled);
 
         _settings.Autostart = enabled;
         _settings.Save(_root);

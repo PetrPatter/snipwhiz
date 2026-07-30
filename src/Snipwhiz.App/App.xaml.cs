@@ -31,10 +31,7 @@ public partial class App : Application
     private readonly BitBltGrabber _grabber = new();
     // Overridable so verification runs against a throwaway library instead of the
     // user's real captures. Unset in normal use.
-    private readonly string _root =
-        Environment.GetEnvironmentVariable("SNIPWHIZ_ROOT") is { Length: > 0 } root
-            ? root
-            : CaptureStore.DefaultRoot;
+    private readonly string _root = CaptureStore.ResolveRoot();
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -131,9 +128,15 @@ public partial class App : Application
                 return;
             }
 
-            _tray.ShowBalloon("Snipwhiz is running", "Press Ctrl+Shift+2 to capture the screen.");
-
-            OfferPrintScreenTakeover(settings);
+            if (settings.FirstRunShown)
+            {
+                _tray.ShowBalloon("Snipwhiz is running", "Press Ctrl+Shift+2 to capture the screen.");
+                OfferPrintScreenTakeover(settings);
+            }
+            else
+            {
+                ShowFirstRun(settings);
+            }
         }
         catch (Exception ex)
         {
@@ -260,6 +263,48 @@ public partial class App : Application
         if (!_libraryHiddenForCapture) return;
         _libraryHiddenForCapture = false;
         _library?.Reveal(activate: false);
+    }
+
+    /// <summary>
+    /// The only window this app has ever opened without being asked, and it opens
+    /// once.
+    ///
+    /// <para>Non-modal on purpose. <c>ShowDialog</c> here would block
+    /// <c>OnStartup</c> from returning, and the hotkeys are already registered by
+    /// this point — someone who presses Ctrl+Shift+1 while reading the window that
+    /// just told them to must get a capture, not a beep.</para>
+    ///
+    /// <para>The window collects answers; every effect is applied here, through the
+    /// paths that already own it. Autostart in particular goes through the tray's
+    /// menu item, because the registry write has one owner and the tick has to stay
+    /// honest about what is on disk.</para>
+    /// </summary>
+    private void ShowFirstRun(Settings settings)
+    {
+        var snippingToolHolds = PrintScreenTakeover.IsSnippingToolBound();
+        var window = new FirstRunWindow(offerPrintScreen: snippingToolHolds);
+
+        window.Closed += (_, _) =>
+        {
+            // Set before anything that saves, because both branches below write the
+            // file and neither should leave this flag behind. Dismissing the window
+            // by any means counts as having seen it; there is no way to be shown it
+            // twice by closing it wrong.
+            settings.FirstRunShown = true;
+            settings.PrintScreenPromptAnswered = true;
+
+            if (window.StartWithWindows) _tray!.Autostart = true;   // writes HKCU, saves
+
+            // The same two outcomes OfferPrintScreenTakeover reaches, from a
+            // checkbox rather than a message box: take the key when it was offered
+            // and wanted, or claim it silently when nothing was holding it.
+            if (snippingToolHolds && window.TakeOverPrintScreen) PrintScreenTakeover.Release();
+
+            if (!snippingToolHolds || window.TakeOverPrintScreen) TryClaimPrintScreen(settings);
+            else settings.Save(_root);
+        };
+
+        window.Show();
     }
 
     private void OfferPrintScreenTakeover(Settings settings)
