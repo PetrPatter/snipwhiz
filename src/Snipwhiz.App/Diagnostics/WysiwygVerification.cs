@@ -85,7 +85,7 @@ internal static class WysiwygVerification
             if (BreakWysiwyg) Nudge(document);
             var exported = Flattener.Render(source, document);
 
-            Write(Compare(onScreen, exported));
+            Write(Compare(onScreen, exported), exported.PixelWidth, exported.PixelHeight);
 
             window.Close();
             Application.Current.Shutdown();
@@ -134,6 +134,15 @@ internal static class WysiwygVerification
     private static SceneDocument BuildScene()
     {
         var document = new SceneDocument { CaptureId = Guid.CreateVersion7() };
+
+        // Cropped, and deliberately off-origin so a missing translate shows up as a
+        // shift rather than as nothing at all. Several objects below straddle its
+        // edge, which is what makes this a test of clipping and not merely of size:
+        // the two paths have to agree about the half of a rectangle that is outside.
+        // They agree by construction — both translate by the crop origin into a
+        // crop-sized target and let the target's own edge do the clipping — and this
+        // is what would say so if that ever became two mechanisms.
+        document.Crop = new Rect(40, 30, 430, 300);
 
         // Plain outline.
         document.Annotations.Add(Rect(60, 50, 160, 90, 0,
@@ -216,16 +225,16 @@ internal static class WysiwygVerification
         return source;
     }
 
-    private static void Write(Diff diff)
+    private static void Write(Diff diff, int width, int height)
     {
         var mode = BreakWysiwyg
             ? "NEGATIVE CONTROL (exported scene shifted one pixel)"
             : "POSITIVE (canvas visuals vs flattener)";
 
-        var total = Width * Height;
+        var total = width * height;
         File.WriteAllText(ResultPath,
             $"mode={mode}\n" +
-            $"imageSize={Width}x{Height}   ({total:N0} pixels)\n" +
+            $"capture={Width}x{Height}, compared over {width}x{height}   ({total:N0} pixels)\n" +
             "\n" +
             $"differingPixels={diff.DifferingPixels}\n" +
             $"maxChannelDelta={diff.MaxChannelDelta}\n" +

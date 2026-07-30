@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Media;
 using Snipwhiz.Core.Annotations;
 
@@ -174,6 +175,29 @@ public sealed class RestyleAnnotation(Annotation annotation, AnnotationStyle bef
     {
         if (newer is not RestyleAnnotation restyle || !ReferenceEquals(restyle.Annotation, annotation)) return false;
         After = restyle.After;
+        return true;
+    }
+}
+
+/// <summary>
+/// Changes the document's crop.
+///
+/// <para>A command like any other, so cropping undoes. Nothing is destroyed either
+/// way: the crop is a rectangle on the document and the original capture is never
+/// rewritten, which is what makes "widen it again next week" possible at all.</para>
+/// </summary>
+public sealed class CropDocument(Rect? before, Rect? after) : ISceneCommand
+{
+    public Rect? After { get; private set; } = after;
+
+    public void Do(SceneDocument document) => document.Crop = After;
+
+    public void Undo(SceneDocument document) => document.Crop = before;
+
+    public bool TryAbsorb(ISceneCommand newer)
+    {
+        if (newer is not CropDocument crop) return false;
+        After = crop.After;
         return true;
     }
 }

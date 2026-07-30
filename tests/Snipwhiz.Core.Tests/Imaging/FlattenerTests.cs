@@ -167,6 +167,44 @@ public class FlattenerTests : IDisposable
         Assert.Equal(Colors.White, PixelAt(rendered, 19, 19));
     }
 
+    /// <summary>
+    /// <b>The task's verification.</b> Crop something out of sight, put it away, get
+    /// it back out, widen the crop — and the thing is whole.
+    ///
+    /// <para>This is the promise the whole non-destructive format exists to keep, and
+    /// it is the one that a crop implemented as "write a smaller PNG" would silently
+    /// break: everything would look right until the day someone wanted the edges
+    /// back, by which time the pixels would be a week gone.</para>
+    /// </summary>
+    [Fact]
+    public void An_annotation_cropped_out_of_sight_comes_back_whole_when_the_crop_widens()
+    {
+        var scene = Scene(
+            Filled(new Point(10, 10), new Point(30, 30), Colors.Blue),
+            Filled(new Point(70, 70), new Point(90, 90), Colors.Red, z: 1));
+        scene.Crop = new Rect(0, 0, 50, 50);
+
+        var path = System.IO.Path.Combine(_dir, "cropped.ssproj");
+        Core.Project.ProjectStore.Save(path, scene);
+        var reopened = Core.Project.ProjectStore.Load(path);
+
+        // Retained, not deleted. Two objects went in and two come out, even though
+        // only one of them can be seen.
+        Assert.Equal(2, reopened.Annotations.Count);
+        Assert.Equal(new Rect(0, 0, 50, 50), reopened.Crop);
+
+        var narrow = Sta.Run(() => Flattener.Render(White(), reopened));
+        Assert.Equal(50, narrow.PixelWidth);
+        Assert.Equal(Colors.Blue, PixelAt(narrow, 20, 20));
+
+        reopened.Crop = null;
+        var wide = Sta.Run(() => Flattener.Render(White(), reopened));
+
+        Assert.Equal(100, wide.PixelWidth);
+        Assert.Equal(Colors.Blue, PixelAt(wide, 20, 20));
+        Assert.Equal(Colors.Red, PixelAt(wide, 80, 80));   // back, and where it always was
+    }
+
     [Fact]
     public void A_degenerate_crop_falls_back_to_the_whole_capture()
     {

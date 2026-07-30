@@ -58,6 +58,7 @@ public partial class EditorView : UserControl
         ArrowToolButton.Click += (_, _) => UseShape(ArrowToolButton, () => new ArrowAnnotation());
         HighlightToolButton.Click += (_, _) => UseShape(HighlightToolButton, () => new HighlightAnnotation());
         TextToolButton.Click += (_, _) => UseShape(TextToolButton, () => new TextAnnotation());
+        CropToolButton.Click += (_, _) => UseCrop();
 
         Canvas.SelectionChanged += RefreshStatus;
         Canvas.ViewChanged += RefreshStatus;   // panning moves the pill too
@@ -185,10 +186,26 @@ public partial class EditorView : UserControl
 
     // ---- tools ------------------------------------------------------------
 
-    private void UseSelect()
+    private void UseSelect() => SwitchTool(new SelectTool(Canvas, _document, _undo), SelectToolButton);
+
+    private void UseCrop() => SwitchTool(new CropTool(Canvas, _document, _undo), CropToolButton);
+
+    /// <summary>
+    /// Puts one tool down and picks another up.
+    ///
+    /// <para>Crop is the first tool with state outside the document — it makes the
+    /// canvas show the part being cropped away — so leaving it has to mean
+    /// something. Routed through one place rather than remembered at each of the
+    /// eight call sites that change tools.</para>
+    /// </summary>
+    private void SwitchTool(ITool next, ToggleButton button)
     {
-        _tool = new SelectTool(Canvas, _document, _undo);
-        SetToolChecked(SelectToolButton);
+        if (_tool is CropTool leaving) leaving.Deactivate();
+
+        _tool = next;
+        if (next is CropTool entering) entering.Activate();
+
+        SetToolChecked(button);
     }
 
     private void UseShape(ToggleButton button, Func<Annotation> create)
@@ -207,8 +224,7 @@ public partial class EditorView : UserControl
             // plate selected and waiting to be discovered.
             if (created is TextAnnotation text) _text.Begin(text);
         };
-        _tool = shape;
-        SetToolChecked(button);
+        SwitchTool(shape, button);
     }
 
     private void SetToolChecked(ToggleButton? active)
@@ -544,6 +560,7 @@ public partial class EditorView : UserControl
             case Key.A when !control: UseShape(ArrowToolButton, () => new ArrowAnnotation()); break;
             case Key.H when !control: UseShape(HighlightToolButton, () => new HighlightAnnotation()); break;
             case Key.T when !control: UseShape(TextToolButton, () => new TextAnnotation()); break;
+            case Key.C when !control: UseCrop(); break;
 
             case Key.Left: Nudge(-Step(shift), 0); break;
             case Key.Right: Nudge(Step(shift), 0); break;
@@ -565,6 +582,11 @@ public partial class EditorView : UserControl
         // invalidated; the selection may now point at something that is gone.
         Canvas.Rebuild();
         Canvas.SetSelection(Canvas.Selection.Where(_document.Annotations.Contains));
+
+        // The crop is the one thing undo can change that the view itself is built
+        // from, so rebuilding the objects is not enough.
+        Canvas.SyncView();
+        if (_tool is CropTool crop) crop.SyncPreview();
     }
 
     /// <summary>

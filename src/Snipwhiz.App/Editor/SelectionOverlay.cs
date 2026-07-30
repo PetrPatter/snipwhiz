@@ -33,9 +33,15 @@ internal static class SelectionOverlay
     private static readonly Pen MarqueeEdge = Frozen(new Pen(Frozen(Color.FromRgb(0xE8, 0x83, 0x3A)), 1));
     private static readonly Brush MarqueeFill = Frozen(Color.FromArgb(0x22, 0xE8, 0x83, 0x3A));
 
+    private static readonly Brush CropDim = Frozen(Color.FromArgb(0xA8, 0x0E, 0x0D, 0x0C));
+
     public static void Render(
         DrawingContext dc, CanvasHost canvas, IReadOnlyList<Annotation> selection, Rect? marquee)
     {
+        // Before the selection, so a selected object inside the crop still reads as
+        // selected while the area around it is dimmed.
+        if (canvas.CropPreview is { } crop) DrawCrop(dc, canvas, crop);
+
         foreach (var annotation in selection) DrawOutline(dc, canvas, annotation);
 
         // Handles only for a single selection. With several selected the useful
@@ -44,6 +50,39 @@ internal static class SelectionOverlay
         if (selection.Count == 1) DrawHandles(dc, canvas, selection[0]);
 
         if (marquee is { } band) dc.DrawRectangle(MarqueeFill, MarqueeEdge, band);
+    }
+
+    /// <summary>
+    /// Dims everything outside the pending crop and puts handles on its edge.
+    ///
+    /// <para>The dim is one even-odd geometry rather than four rectangles round the
+    /// edges: four rectangles have to be computed for a rect that may extend past
+    /// the viewport in any direction, and the arithmetic for the corners is exactly
+    /// the sort that is wrong only when the crop is partly off-screen.</para>
+    /// </summary>
+    private static void DrawCrop(DrawingContext dc, CanvasHost canvas, Rect crop)
+    {
+        var inner = new Rect(canvas.ToElement(crop.TopLeft), canvas.ToElement(crop.BottomRight));
+        var outer = new Rect(0, 0, canvas.ActualWidth, canvas.ActualHeight);
+
+        var mask = new GeometryGroup { FillRule = FillRule.EvenOdd };
+        mask.Children.Add(new RectangleGeometry(outer));
+        mask.Children.Add(new RectangleGeometry(inner));
+        mask.Freeze();
+        dc.DrawGeometry(CropDim, null, mask);
+
+        dc.DrawRectangle(null, Outline, inner);
+
+        // The same handle geometry the selection uses, positioned from the same
+        // Handles table — a crop rectangle is an unrotated box and there is no second
+        // implementation of where its corners are.
+        var proxy = CropProxy.For(crop);
+        foreach (var kind in Handles.Resizers)
+        {
+            var centre = canvas.ToElement(Handles.ImagePosition(proxy, kind, 0));
+            dc.DrawRectangle(HandleFill, HandleEdge, new Rect(
+                centre.X - HandleSize / 2, centre.Y - HandleSize / 2, HandleSize, HandleSize));
+        }
     }
 
     private static void DrawOutline(DrawingContext dc, CanvasHost canvas, Annotation annotation)
