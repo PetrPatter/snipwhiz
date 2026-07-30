@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- The subjects are WPF controls, so the test assembly needs the WPF types
+         to name them at all. -->
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <!-- Same reason as Snipwhiz.App's own csproj: System.Windows.Forms arrives
+         transitively and shadows the WPF input types these tests are entirely
+         about — MouseEventArgs, KeyEventArgs, and Point/Size/Color. -->
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <!--
+    Linked, not copied and not extracted into a third "test kit" project. It is
+    one file with one method; a shared project to hold it would be more assembly
+    than the code it carries. If a second file ever needs sharing, that is the
+    moment to reconsider — not before.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Snipwhiz.Core.Tests\Sta.cs" Link="Sta.cs" />
+    <!-- It keeps its own namespace, which is the price of linking rather than
+         moving. One alias is cheaper than touching the file both projects share. -->
+    <Using Include="Snipwhiz.Core.Tests.Sta" Alias="Sta" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Snipwhiz.App\Snipwhiz.App.csproj" />
+  </ItemGroup>
+
+  <!-- Suppress transitive SQLite vulnerability (see Snipwhiz.Core.csproj) -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+</Project>
