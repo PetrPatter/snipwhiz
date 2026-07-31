@@ -26,6 +26,10 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Sets the icon on the exe itself, which is what Explorer, Alt+Tab, the
+         taskbar and every WPF window's title bar read. Generated, not hand-drawn:
+         see assets/icon/generate.cs. -->
+    <ApplicationIcon>Snipwhiz.ico</ApplicationIcon>
     <!-- WFO0003 assumes a pure WinForms app configured via Application.SetHighDpiMode.
          This app is WPF-hosted; DPI awareness is correctly declared in app.manifest
          (PerMonitorV2, required for correct monitor bounds), and WinForms is used
@@ -59,6 +63,14 @@
 
   <ItemGroup>
     <AdditionalFiles Include="NativeMethods.txt" />
+  </ItemGroup>
+
+  <!-- Also embedded as a resource, separately from ApplicationIcon. The tray needs
+       to pick a specific frame out of the .ico at the size Windows is asking for,
+       and ExtractAssociatedIcon only ever hands back 32px, which is then squashed
+       to 16 and looks it. -->
+  <ItemGroup>
+    <Resource Include="Snipwhiz.ico" />
   </ItemGroup>
 
   <!--

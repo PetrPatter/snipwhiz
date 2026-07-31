@@ -94,6 +94,30 @@ try {
     Say "capture files:       $($before.Count)"
 
     Say ""
+    Say "=== branding and shortcuts, before anything is removed ==="
+    # Asserted before the uninstall, not only after. "Zero shortcuts remain" is
+    # satisfied just as well by never having created any, which is the same
+    # blindness that let the library deletion through the first time.
+    Add-Type -AssemblyName System.Drawing
+    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
+    Say "exe carries an icon: $($null -ne $icon)"
+    if (-not $icon) { throw "the installed exe has no icon - it will show the generic placeholder everywhere" }
+
+    $made = @(Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Recurse -Filter 'Snipwhiz*.lnk' -EA SilentlyContinue) +
+            @(Get-ChildItem "$env:USERPROFILE\Desktop" -Filter 'Snipwhiz*.lnk' -EA SilentlyContinue)
+    Say "shortcuts created:   $($made.Count) [$(($made | ForEach-Object { $_.Name }) -join ', ')]"
+    if ($made.Count -eq 0) { throw "no shortcuts were created - nothing for anyone to launch" }
+
+    # A shortcut pointing at the wrong target is a shortcut that installs cleanly
+    # and does nothing, which no other check here would notice.
+    $shell = New-Object -ComObject WScript.Shell
+    foreach ($lnk in $made) {
+        $target = $shell.CreateShortcut($lnk.FullName).TargetPath
+        Say "  -> $($lnk.Name): $(if (Test-Path $target) { 'target exists' } else { "BROKEN: $target" })"
+        if (-not (Test-Path $target)) { throw "shortcut '$($lnk.Name)' points at nothing" }
+    }
+
+    Say ""
     Say "=== uninstall, the way a user does it ==="
     # Found by display name rather than key name: the key is the packId, and this
     # gate exists partly to catch the packId being wrong.

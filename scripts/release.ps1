@@ -104,6 +104,7 @@ vpk pack `
     --packTitle Snipwhiz `
     --packAuthors Snipwhiz `
     --mainExe Snipwhiz.App.exe `
+    --icon (Join-Path $repo 'src\Snipwhiz.App\Snipwhiz.ico') `
     --outputDir $releases `
     @sign
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed." }

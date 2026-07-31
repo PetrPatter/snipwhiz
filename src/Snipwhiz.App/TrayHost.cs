@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 using Snipwhiz.Core;
@@ -75,7 +76,7 @@ public sealed class TrayHost : IDisposable
 
         _icon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,       // replaced with real branding in spec 6
+            Icon = TrayIcon(),
             Text = "Snipwhiz",
             Visible = true,
             ContextMenuStrip = menu,
@@ -83,6 +84,37 @@ public sealed class TrayHost : IDisposable
         // Opens the library, not a capture: a hotkey is the natural way to capture,
         // and a double-click is the natural way to open a window.
         _icon.DoubleClick += (_, _) => LibraryRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// The tray icon at the size Windows is actually asking for.
+    ///
+    /// <para>The .ico carries nine frames, and which one is picked matters more
+    /// here than anywhere else in the app: the tray is the smallest surface the
+    /// icon appears on, and the 16px frame is drawn with its own geometry rather
+    /// than being a shrunk 256. Passing <see cref="SystemInformation.SmallIconSize"/>
+    /// also gets this right on a scaled display, where "small" is 20 or 24 rather
+    /// than 16.</para>
+    ///
+    /// <para>Falls back rather than throwing. A missing icon is a cosmetic fault;
+    /// an exception here would take the tray, and therefore the whole app, down
+    /// with it.</para>
+    /// </summary>
+    private static Icon TrayIcon()
+    {
+        try
+        {
+            var resource = System.Windows.Application.GetResourceStream(
+                new Uri("pack://application:,,,/Snipwhiz.ico", UriKind.Absolute));
+            if (resource is null) return SystemIcons.Application;
+
+            using var stream = resource.Stream;
+            return new Icon(stream, SystemInformation.SmallIconSize);
+        }
+        catch (Exception e) when (e is IOException or ArgumentException or UriFormatException)
+        {
+            return SystemIcons.Application;
+        }
     }
 
     public void ShowBalloon(string title, string text, bool isError = false)
