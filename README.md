@@ -64,3 +64,7 @@ that no test could: an uninstaller that deleted the user's entire library.
 
 Works, and in daily use. Capture, library and editor are done; video, scrolling
 capture and OCR are not built yet.
+
+## Licence
+
+[MIT](LICENSE). Do what you like with it.
