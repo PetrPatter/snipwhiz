@@ -87,8 +87,18 @@ else {
 
 # --- 5. Pack -----------------------------------------------------------------
 Write-Host "Packing..." -ForegroundColor Cyan
+# --packId is not cosmetic: it is the folder name Velopack installs into, under
+# %LOCALAPPDATA%, and its uninstaller removes that folder whole. With packId
+# 'Snipwhiz' that folder IS the library - captures, database and settings - and a
+# real uninstall in Windows Sandbox deleted every screenshot the user had taken.
+#
+# So the app gets its own directory and the library keeps %LOCALAPPDATA%\Snipwhiz.
+# The user-visible name comes from --packTitle and is unaffected.
+#
+# Changing this after a release would orphan every existing install, since Velopack
+# identifies an app by packId. It is settled here, before anything is published.
 vpk pack `
-    --packId Snipwhiz `
+    --packId SnipwhizApp `
     --packVersion $version `
     --packDir $publish `
     --packTitle Snipwhiz `

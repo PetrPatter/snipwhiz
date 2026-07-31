@@ -176,9 +176,22 @@ For this audience that is correct — these are personal laptops, not managed fl
 
 ### 4.6 The library survives an uninstall, and says so
 
-Uninstalling removes the app from `%LOCALAPPDATA%\Snipwhiz\app-*`. The **library**
-— captures, projects, the database — lives beside it and is the user's data, not
-the application's.
+Uninstalling removes the app from `%LOCALAPPDATA%\SnipwhizApp`. The **library** —
+captures, projects, the database — lives in `%LOCALAPPDATA%\Snipwhiz` and is the
+user's data, not the application's.
+
+**Those two directory names are the whole mechanism, and this section originally
+got it wrong.** It claimed the app installed to `%LOCALAPPDATA%\Snipwhiz\app-*`,
+*beside* the library. It does not: Velopack installs into `%LOCALAPPDATA%\<packId>`
+and its uninstaller removes that directory whole. With a packId of `Snipwhiz` the
+directory it removes **is** the library, and a real uninstall in Windows Sandbox
+deleted every screenshot the user had taken. The app therefore gets a packId of
+`SnipwhizApp` and its own directory; the display name comes from `packTitle` and is
+unchanged.
+
+No amount of care in the uninstall hook could have prevented this, which is the
+point — the hook is the app's code, and the deletion is Velopack's. Only a real
+install and a real uninstall could show it.
 
 **Deleting someone's screenshots because they uninstalled an app is not a decision
 an uninstaller gets to make silently.** It stays, and the uninstall path says

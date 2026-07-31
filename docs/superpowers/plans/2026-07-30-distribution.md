@@ -104,9 +104,17 @@ failure the ordering exists to prevent. And `vpk` refuses to pack a binary whose
 `Main` does not call it — a guard that was already there and is better than the
 comment describing it.
 
-**Still open: the clean-install gate**, which needs a machine that has never had the
-SDK. Windows Sandbox covers this — free, built into Windows 11 Pro, and clean on
-*every* run rather than clean once. It is not yet enabled here.
+**Clean-install gate: PASSED**, in Windows Sandbox, via `scripts\verify-clean-install.ps1`.
+
+It proves the app *runs* rather than merely installs. Installing only shows files
+were copied; the gate presses Ctrl+Shift+2 and looks for a PNG, which is what shows
+WPF started, the hotkey registered, the screen grab worked and SQLite wrote — the
+set of things a missing runtime actually breaks. On a machine with no `dotnet` on
+`PATH`: installed, launched itself, showed the first-run window, and captured 2,974
+KB.
+
+**The gate's first run failed, and found the bug this whole phase exists for.** See
+D4 — it was not a packaging detail, it deleted the user's screenshots.
 
 ---
 
@@ -164,6 +172,33 @@ gate fail, so it is reading the library rather than agreeing with itself.
 The gate touches the real `HKCU` Run value because that write has no test seam, so
 it saves and restores whatever was there. That turned out to matter — this machine
 had autostart genuinely set.
+
+---
+
+**And then the real uninstall deleted every screenshot anyway.**
+
+The local gate above passed while being blind to the actual failure. It ran the
+`--veloapp-uninstall` hook, so it proved *this app's code* does not delete the
+library — and Velopack deleted it a moment later, from outside the hook entirely.
+
+The cause was a directory name. Velopack installs into `%LOCALAPPDATA%\<packId>`
+and its uninstaller removes that directory whole. With a packId of `Snipwhiz` that
+directory **is** the library. The spec asserted the app installed to
+`%LOCALAPPDATA%\Snipwhiz\app-*`, beside the library; that was simply wrong, and
+§4.6 has been corrected. The app now packs as `SnipwhizApp` and owns its own
+directory, while the library keeps `%LOCALAPPDATA%\Snipwhiz`. No user data moves,
+and the display name comes from `packTitle`, so nothing visible changed.
+
+Settled before anything is published, which matters: Velopack identifies an app by
+packId, so changing it after a release would orphan every existing install.
+
+**Re-run in Sandbox: PASSED** — app directory, ARP entry, autostart value and
+shortcuts all gone; capture byte-identical; database intact.
+
+**The lesson is about the gate, not the bug.** An automated check that exercises
+one layer is blind to the layers around it — the hook is the app's code, the
+deletion was the installer's, and no amount of care inside the hook could have
+prevented or revealed it. Only a real install and a real uninstall could.
 
 ---
 
