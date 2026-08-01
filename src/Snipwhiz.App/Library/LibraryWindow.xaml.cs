@@ -49,12 +49,6 @@ public partial class LibraryWindow : Window
         _model = new LibraryViewModel(store, thumbnails);
         DataContext = _model;
 
-        _preview = new PreviewView(store);
-        _preview.Dismissed += () => RootContent.Visibility = Visibility.Visible;
-        _preview.DeleteRequested += Delete;
-        _preview.EditRequested += record => EditRequested?.Invoke(record);
-        PreviewHost.Content = _preview;
-
         LibraryTab.Click += (_, _) => ShowLibraryScreen();
         EditTab.Click += (_, _) => { if (_editor?.Record is not null) SetScreen(editing: true); };
         EditTab.IsEnabled = false;
@@ -135,7 +129,6 @@ public partial class LibraryWindow : Window
         SizeChanged += (_, _) => ApplyColumns();
     }
 
-    private readonly PreviewView _preview;
     private ScrollViewer? _scroller;
     private readonly DispatcherTimer _searchDebounce;
 
@@ -215,8 +208,6 @@ public partial class LibraryWindow : Window
         LibraryTabMark.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
         EditTab.Foreground = editing ? Ink : InkMuted;
         LibraryTab.Foreground = editing ? InkMuted : Ink;
-
-        if (!editing) _preview.Close();
     }
 
     private bool IsEditing => EditorHost.Visibility == Visibility.Visible;
@@ -487,16 +478,28 @@ public partial class LibraryWindow : Window
 
     private void OnGridClick(object sender, MouseButtonEventArgs e)
     {
+        // A click on one of the tile's own buttons is not a click on the tile.
+        //
+        // This has to be decided here rather than in the button's Click handler,
+        // which is where it was first tried and does not work: Click bubbles, and
+        // this is a Preview handler that tunnels, so the grid has already acted by
+        // the time the button hears about it. Marking the args handled in Click is
+        // marking them after the fact.
+        if (FindAncestor<System.Windows.Controls.Button>(e.OriginalSource as DependencyObject) is not null) return;
+
         var tile = FindAncestor<CaptureTile>(e.OriginalSource as DependencyObject);
         if (tile?.DataContext is not CaptureTileViewModel model) return;
 
-        // A capture with no file has nothing to preview; its only action is to
-        // remove the row, which the tile itself offers.
+        // A capture with no file has nothing to open; its only action is to remove
+        // the row, which the tile itself offers.
         if (model.IsMissing) return;
 
-        RootContent.Visibility = Visibility.Collapsed;
-        _preview.Open(model.Record);
-        _preview.Focus();
+        // Straight to the editor. There used to be a preview screen between these
+        // two, showing the capture larger with Copy, Delete and Edit on it — but
+        // the library already shows the capture, and every one of those three is
+        // now reachable without it: Copy and Delete on the tile, and editing is
+        // what a click on a capture most likely meant.
+        EditRequested?.Invoke(model.Record);
     }
 
     /// <summary>
@@ -590,16 +593,10 @@ public partial class LibraryWindow : Window
 
         if (e.Key == Key.Escape)
         {
-            // Esc backs out one level: preview first, then the window.
-            if (_preview.IsOpen) _preview.Close();
-            else { FlushPendingDeletes(); Hide(); }
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control && _preview.IsOpen)
-        {
-            _preview.CopyToClipboard();
+            // One level, not two. There is no preview to back out of any more, and
+            // the editor consumes its own Escape before this ever runs.
+            FlushPendingDeletes();
+            Hide();
             e.Handled = true;
             return;
         }

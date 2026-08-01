@@ -179,9 +179,6 @@
                    FontSize="12"/>
     </Grid>
 
-        <!-- Preview sits above the grid in the same window (spec 2a §4.11). -->
-        <ContentControl x:Name="PreviewHost" Grid.Row="1" Margin="20,12,20,12"/>
-
         <!-- The Edit screen. Same row, shown instead of the library. -->
         <ContentControl x:Name="EditorHost" Grid.Row="1"
                         Margin="28,14,28,16" Visibility="Collapsed"/>
