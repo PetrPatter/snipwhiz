@@ -1,0 +1,560 @@
+<title>Snipwhiz — visual pass</title>
+
+<style>
+/* ---------------------------------------------------------------------------
+   Tokens.
+
+   Not invented. Surface, SurfaceRaised, Ink, InkMuted and Accent are lifted from
+   LibraryWindow.xaml as they already exist; the quartet is the new icon's four
+   corners. The only new value is --ground, a step darker than the app surface so
+   the mocked window can float on the page. Everything here is reachable in WPF.
+--------------------------------------------------------------------------- */
+:root {
+  --ground:   #0E0D0C;
+  --surface:  #1C1B1A;
+  --raised:   #26241F;
+  --raised-2: #332F28;
+  --line:     #3A3630;
+  --ink:      #F5F2EC;
+  --muted:    #8F8A80;
+  --faint:    #6E6960;
+  --accent:   #E8833A;
+
+  --c1: #FFA12E;  --c2: #FF3D6E;  --c3: #A46BFF;  --c4: #1FE0B4;
+
+  /* Windows' own stack. A display face would look good here and could not ship
+     in WPF, so the craft goes into spacing and colour instead of a typeface the
+     real app can never have. */
+  --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Code", "Consolas", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page { max-width: 1180px; margin: 0 auto; padding: 56px 28px 96px; }
+
+/* --- document furniture -------------------------------------------------- */
+.masthead { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+.mark { width: 40px; height: 40px; flex: none; }
+h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; margin: 0; }
+.dek { color: var(--muted); max-width: 66ch; margin: 0 0 8px; }
+
+h2 {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 4px;
+}
+.section { margin-top: 72px; }
+.section-note { color: var(--muted); max-width: 68ch; margin: 0 0 26px; }
+
+hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+/* --- the mocked window --------------------------------------------------- */
+.frame {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.55);
+}
+
+/* Frameless chrome: the app draws its own bar, so the icon and the tabs sit on
+   the same surface as everything else instead of under stock Windows chrome. */
+.titlebar {
+  display: flex; align-items: center; gap: 10px;
+  height: 40px; padding: 0 0 0 14px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.titlebar .mark { width: 16px; height: 16px; }
+.titlebar .name { font-size: 12px; color: var(--muted); }
+.wincontrols { margin-left: auto; display: flex; }
+.wincontrols i {
+  width: 46px; height: 40px; display: grid; place-items: center;
+  color: var(--muted); font-style: normal; font-size: 11px;
+}
+.wincontrols i:last-child:hover { background: #C42B1C; color: #fff; }
+.wincontrols i:hover { background: rgba(255,255,255,.07); color: var(--ink); }
+
+.tabs { display: flex; gap: 26px; padding: 14px 22px 0; }
+.tab {
+  font-size: 21px; font-weight: 650; color: var(--muted);
+  padding-bottom: 8px; border-bottom: 2px solid transparent; cursor: pointer;
+  letter-spacing: -0.01em;
+}
+.tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+
+/* --- library ------------------------------------------------------------- */
+.libhead {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 22px 14px;
+}
+.search {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--raised); border: 1px solid transparent;
+  border-radius: 9px; padding: 8px 13px; width: 300px;
+}
+.search:focus-within { border-color: var(--accent); }
+.search svg { flex: none; color: var(--faint); }
+.search span { color: var(--faint); font-size: 13px; }
+.tally { margin-left: auto; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+.dayhead {
+  padding: 8px 22px 10px;
+  font-size: 12px; font-weight: 650; color: var(--muted); letter-spacing: .04em;
+}
+
+/* The fix for the ragged gutter: tiles divide the width instead of claiming a
+   fixed 252 and leaving the remainder empty. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 16px;
+  padding: 0 22px 18px;
+}
+
+.tile {
+  background: var(--raised);
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .16s cubic-bezier(.2,.8,.3,1), border-color .16s, background .16s;
+}
+.tile:hover { background: var(--raised-2); border-color: var(--accent); transform: translateY(-2px); }
+.tile:focus-visible { outline: 2px solid var(--c4); outline-offset: 2px; }
+
+.shot {
+  position: relative; height: 132px; overflow: hidden;
+  /* A light mat, not near-black. Dark captures on a dark tile were invisible;
+     this gives every thumbnail an edge regardless of what is in it. */
+  background: #6A6459;
+  display: grid; place-items: center;
+}
+.shot > .inner { width: calc(100% - 12px); height: calc(100% - 12px); border-radius: 5px; overflow: hidden; }
+
+.actions {
+  position: absolute; inset: auto 8px 8px auto;
+  display: flex; gap: 6px; opacity: 0; transform: translateY(4px);
+  transition: opacity .14s, transform .14s;
+}
+.tile:hover .actions { opacity: 1; transform: none; }
+.act {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(20,19,18,.86); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.13); border-radius: 7px;
+  padding: 5px 9px; font-size: 11.5px; color: var(--ink);
+}
+.act.primary { background: var(--accent); border-color: var(--accent); color: #1C1B1A; font-weight: 650; }
+
+.cap { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px 11px; }
+.cap b { font-weight: 450; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cap time { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* fake capture content ---------------------------------------------------- */
+.term { background: #12100F; height: 100%; padding: 9px 10px; }
+.term i { display: block; height: 4px; border-radius: 2px; background: #3E7C5B; margin-bottom: 5px; font-style: normal; }
+.term i:nth-child(2n) { background: #4A4640; }
+.term i:nth-child(3n) { background: #7C6A3E; }
+.code { background: #16151A; height: 100%; padding: 9px 10px; }
+.code i { display: block; height: 4px; border-radius: 2px; background: #4C6FA8; margin-bottom: 5px; font-style: normal; }
+.code i:nth-child(2n) { background: #46403A; }
+.code i:nth-child(5n) { background: #A8608C; }
+.web { background: linear-gradient(160deg,#243447,#121A24); height: 100%; padding: 9px 10px; }
+.web i { display: block; height: 5px; border-radius: 2px; background: rgba(255,255,255,.16); margin-bottom: 6px; font-style: normal; }
+.web i:first-child { background: var(--c1); width: 40%; }
+
+/* --- editor -------------------------------------------------------------- */
+.editor { display: flex; gap: 14px; padding: 14px 18px 0; }
+
+/* The rail hugs its buttons instead of stretching the window height, and the
+   groups are the tool families rather than one undifferentiated column. */
+.rail {
+  align-self: start;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; display: flex; flex-direction: column; gap: 3px;
+}
+.rail hr { border-top: 1px solid var(--line); margin: 5px 6px; }
+.rail b {
+  width: 34px; height: 34px; border-radius: 8px;
+  display: grid; place-items: center; color: var(--muted); cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.rail b:hover { background: var(--raised-2); color: var(--ink); }
+.rail b.on { background: var(--accent); color: #1C1B1A; }
+
+.stage {
+  flex: 1; position: relative; min-height: 428px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  /* The canvas is now visibly not the picture. */
+  background:
+    repeating-conic-gradient(#211F1D 0 25%, #191817 0 50%) 0 0 / 18px 18px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.sheet {
+  position: relative; width: 74%; aspect-ratio: 16/9;
+  background: #12100F;
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 10px 34px rgba(0,0,0,.6);
+  overflow: hidden;
+}
+.sheet .term { padding: 16px 18px; }
+.sheet .term i { height: 6px; margin-bottom: 8px; }
+
+/* annotations drawn on the mocked capture */
+.arrow { position: absolute; left: 46%; top: 30%; width: 108px; height: 3px; background: var(--c2); transform: rotate(24deg); transform-origin: left center; border-radius: 2px; }
+.arrow::after { content: ""; position: absolute; right: -3px; top: -5px; border-left: 13px solid var(--c2); border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+.badge { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--c2); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.boxann { position: absolute; border: 2.5px solid var(--c1); border-radius: 4px; }
+
+.pill {
+  position: absolute; display: flex; align-items: center; gap: 10px;
+  background: rgba(38,36,31,.94); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 11px;
+  padding: 8px 11px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.55);
+}
+.sw { width: 17px; height: 17px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.sw.on { border-color: var(--ink); }
+.pill .div { width: 1px; height: 20px; background: var(--line); }
+.track { width: 82px; height: 4px; border-radius: 2px; background: var(--raised-2); position: relative; }
+.track::after { content: ""; position: absolute; inset: 0 42% 0 0; background: var(--accent); border-radius: 2px; }
+.track::before { content: ""; position: absolute; left: 58%; top: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); }
+.pill small { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.docbar { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.btn {
+  border: 1px solid var(--line); background: transparent; color: var(--ink);
+  border-radius: 8px; padding: 7px 14px; font-size: 12.5px; font-family: var(--ui); cursor: pointer;
+}
+.btn:hover { background: var(--raised); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #1C1B1A; font-weight: 650; }
+.btn.primary:hover { background: #F09A57; }
+
+.statusbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 22px 14px; color: var(--muted); font-size: 12px;
+}
+.zoom { margin-left: auto; display: flex; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; }
+.zoom u { text-decoration: none; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; border: 1px solid var(--line); cursor: pointer; }
+.zoom u:hover { background: var(--raised); color: var(--ink); }
+
+/* --- callouts ------------------------------------------------------------ */
+.pin {
+  position: absolute; z-index: 5;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--c4); color: #0E0D0C;
+  font-size: 12px; font-weight: 700;
+  display: grid; place-items: center;
+  box-shadow: 0 0 0 3px rgba(31,224,180,.22), 0 3px 10px rgba(0,0,0,.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend { margin-top: 22px; display: grid; gap: 0; }
+.legend div {
+  display: grid; grid-template-columns: 26px 1fr; gap: 14px;
+  padding: 13px 0; border-top: 1px solid var(--line);
+}
+.legend div:last-child { border-bottom: 1px solid var(--line); }
+.legend span {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--c4); color: #0E0D0C;
+  font-size: 12px; font-weight: 700; display: grid; place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.legend p { margin: 0; font-size: 14px; }
+.legend p b { font-weight: 650; }
+.legend p em { color: var(--muted); font-style: normal; display: block; margin-top: 2px; font-size: 13.5px; }
+
+.flag {
+  border-left: 2px solid var(--c2);
+  background: rgba(255,61,110,.06);
+  padding: 14px 18px; border-radius: 0 8px 8px 0; margin-top: 26px;
+}
+.flag b { color: var(--c2); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 720px) {
+  .page { padding: 32px 16px 60px; }
+  .editor { flex-direction: column; }
+  .rail { flex-direction: row; align-self: stretch; }
+  .rail hr { width: 1px; height: auto; margin: 6px 5px; border-top: 0; border-left: 1px solid var(--line); }
+}
+</style>
+
+<div class="page">
+
+  <div class="masthead">
+    <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-width="4.7">
+        <path stroke="#FFA12E" d="M5 17V5h12"/>
+        <path stroke="#FF3D6E" d="M31 5h12v12"/>
+        <path stroke="#A46BFF" d="M43 31v12H31"/>
+        <path stroke="#1FE0B4" d="M17 43H5V31"/>
+      </g>
+    </svg>
+    <h1>Snipwhiz — visual pass</h1>
+  </div>
+  <p class="dek">
+    Proposed treatment for the two screens people actually spend time in. Every colour
+    below already exists in <span style="font-family:var(--mono);font-size:13px">LibraryWindow.xaml</span>
+    or in the new icon, and nothing here needs a control WPF does not have.
+  </p>
+
+  <!-- ==================== LIBRARY ==================== -->
+  <div class="section">
+    <h2>01 — Library</h2>
+    <p class="section-note">
+      The grid currently fits as many 252-pixel tiles as will go and leaves the remainder
+      as dead gutter down the right edge. Tiles that divide the width remove it.
+    </p>
+
+    <div class="frame">
+      <div class="pin" style="left:23px; top:112px">1</div>
+      <div class="pin" style="right:150px; top:112px">2</div>
+      <div class="pin" style="left:250px; top:222px">3</div>
+      <div class="pin" style="left:10px; top:8px">4</div>
+
+      <div class="titlebar">
+        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+          <g fill="none" stroke-linecap="round" stroke-width="6">
+            <path stroke="#FFA12E" d="M6 17V6h11"/><path stroke="#FF3D6E" d="M31 6h11v11"/>
+            <path stroke="#A46BFF" d="M42 31v11H31"/><path stroke="#1FE0B4" d="M17 42H6V31"/>
+          </g>
+        </svg>
+        <span class="name">Snipwhiz</span>
+        <div class="wincontrols"><i>&#8212;</i><i>&#9633;</i><i>&#10005;</i></div>
+      </div>
+
+      <div class="tabs"><div class="tab on">Library</div><div class="tab">Edit</div></div>
+
+      <div class="libhead">
+        <div class="search">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14" stroke-linecap="round"/>
+          </svg>
+          <span>Search captures</span>
+        </div>
+        <div class="tally">32 captures · 5.0 MB</div>
+      </div>
+
+      <div class="dayhead">Today</div>
+      <div class="grid">
+        <div class="tile" tabindex="0">
+          <div class="shot"><div class="inner"><div class="term">
+            <i style="width:72%"></i><i style="width:45%"></i><i style="width:88%"></i>
+            <i style="width:36%"></i><i style="width:64%"></i><i style="width:52%"></i>
+            <i style="width:79%"></i><i style="width:41%"></i>
+          </div></div>
+            <div class="actions">
+              <div class="act">Delete</div><div class="act primary">Copy</div>
+            </div>
+          </div>
+          <div class="cap"><b>WindowsTerminal</b><time>10:46</time></div>
+        </div>
+
+        <div class="tile" tabindex="0">
+          <div class="shot"><div class="inner"><div class="code">
+            <i style="width:58%"></i><i style="width:81%"></i><i style="width:39%"></i>
+            <i style="width:69%"></i><i style="width:47%"></i><i style="width:76%"></i>
+            <i style="width:33%"></i><i style="width:61%"></i>
+          </div></div>
+            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+          </div>
+          <div class="cap"><b>Code</b><time>10:33</time></div>
+        </div>
+
+        <div class="tile" tabindex="0">
+          <div class="shot"><div class="inner"><div class="web">
+            <i></i><i style="width:84%"></i><i style="width:57%"></i>
+            <i style="width:73%"></i><i style="width:44%"></i><i style="width:66%"></i>
+          </div></div>
+            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+          </div>
+          <div class="cap"><b>Firefox</b><time>10:19</time></div>
+        </div>
+
+        <div class="tile" tabindex="0">
+          <div class="shot"><div class="inner"><div class="term">
+            <i style="width:63%"></i><i style="width:88%"></i><i style="width:42%"></i>
+            <i style="width:71%"></i><i style="width:55%"></i><i style="width:80%"></i>
+            <i style="width:38%"></i><i style="width:67%"></i>
+          </div></div>
+            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+          </div>
+          <div class="cap"><b>Snipwhiz</b><time>10:17</time></div>
+        </div>
+
+        <div class="tile" tabindex="0">
+          <div class="shot"><div class="inner"><div class="code">
+            <i style="width:77%"></i><i style="width:43%"></i><i style="width:65%"></i>
+            <i style="width:86%"></i><i style="width:51%"></i><i style="width:70%"></i>
+            <i style="width:35%"></i><i style="width:59%"></i>
+          </div></div>
+            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+          </div>
+          <div class="cap"><b>Code</b><time>10:12</time></div>
+        </div>
+      </div>
+
+      <div class="dayhead">Yesterday</div>
+      <div class="grid" style="padding-bottom:24px">
+        <div class="tile" tabindex="0">
+          <div class="shot"><div class="inner"><div class="web">
+            <i></i><i style="width:62%"></i><i style="width:81%"></i><i style="width:49%"></i>
+            <i style="width:74%"></i><i style="width:56%"></i>
+          </div></div>
+            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+          </div>
+          <div class="cap"><b>Outlook</b><time>16:52</time></div>
+        </div>
+        <div class="tile" tabindex="0">
+          <div class="shot"><div class="inner"><div class="term">
+            <i style="width:69%"></i><i style="width:47%"></i><i style="width:83%"></i>
+            <i style="width:40%"></i><i style="width:75%"></i><i style="width:58%"></i>
+            <i style="width:66%"></i><i style="width:44%"></i>
+          </div></div>
+            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+          </div>
+          <div class="cap"><b>WindowsTerminal</b><time>16:20</time></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div><span>1</span><p><b>Tiles divide the width.</b>
+        <em>A fixed 252 leaves whatever does not divide evenly as permanent dead space that changes size as you resize. Tiles that stretch fill it, and the column count still adapts.</em></p></div>
+      <div><span>2</span><p><b>Search reads as a search field.</b>
+        <em>Today it is an empty rounded rectangle with no icon and no placeholder, which reads as a broken control. The capture count moves up beside it, out of the footer.</em></p></div>
+      <div><span>3</span><p><b>Copy and Delete on hover, over the thumbnail.</b>
+        <em>This is where the preview screen's Copy button goes. Re-copying an old capture becomes one hover and one click instead of opening a whole screen.</em></p></div>
+      <div><span>4</span><p><b>The app draws its own title bar.</b>
+        <em>Stock Windows chrome saying "Snipwhiz Library" sits above a designed dark surface and fights it. Spec 1 called for frameless and it never happened.</em></p></div>
+      <div><span>5</span><p><b>Thumbnails get a light mat.</b>
+        <em>Your captures are mostly dark terminals on a near-black tile, so the picture and the chrome bleed together. A light surround gives every capture an edge whatever is in it.</em></p></div>
+    </div>
+  </div>
+
+  <!-- ==================== EDITOR ==================== -->
+  <div class="section">
+    <h2>02 — Editor</h2>
+    <p class="section-note">
+      The canvas and the capture are currently near-identical shades of black, so
+      the edge of the image is invisible. Everything else here follows from giving
+      the picture somewhere to sit.
+    </p>
+
+    <div class="frame">
+      <div class="pin" style="left:23px; top:118px">6</div>
+      <div class="pin" style="right:132px; top:66px">7</div>
+      <div class="pin" style="left:44%; top:198px">8</div>
+      <div class="pin" style="left:132px; top:146px">9</div>
+
+      <div class="titlebar">
+        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+          <g fill="none" stroke-linecap="round" stroke-width="6">
+            <path stroke="#FFA12E" d="M6 17V6h11"/><path stroke="#FF3D6E" d="M31 6h11v11"/>
+            <path stroke="#A46BFF" d="M42 31v11H31"/><path stroke="#1FE0B4" d="M17 42H6V31"/>
+          </g>
+        </svg>
+        <span class="name">Snipwhiz</span>
+        <div class="wincontrols"><i>&#8212;</i><i>&#9633;</i><i>&#10005;</i></div>
+      </div>
+
+      <div class="tabs" style="align-items:center">
+        <div class="tab">Library</div><div class="tab on">Edit</div>
+        <div class="docbar" style="padding-bottom:8px">
+          <button class="btn">Export…</button>
+          <button class="btn primary">Copy</button>
+        </div>
+      </div>
+
+      <div class="editor">
+        <div class="rail">
+          <b class="on" title="Select">
+            <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l9 5.2-3.9.9L6.4 12z"/></svg>
+          </b>
+          <hr>
+          <b title="Rectangle"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="9" rx="1.2"/></svg></b>
+          <b title="Ellipse"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="8" rx="5.6" ry="4.6"/></svg></b>
+          <b title="Line"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12L13 4"/></svg></b>
+          <b title="Arrow"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 12L13 4M9 4h4v4"/></svg></b>
+          <hr>
+          <b title="Highlight"><svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="7" width="12" height="4" rx="1"/></svg></b>
+          <b title="Text"><svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v2H9.2v8H6.8V5H3z"/></svg></b>
+          <b title="Callout"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg></b>
+          <b title="Step"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/></svg></b>
+          <hr>
+          <b title="Magnify"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 14 14" stroke-linecap="round"/></svg></b>
+          <b title="Spotlight"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15" stroke-linecap="round"/></svg></b>
+          <b title="Blur"><svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" opacity=".85"><circle cx="5" cy="6" r="2"/><circle cx="11" cy="7" r="2.4"/><circle cx="7" cy="11" r="1.8"/></svg></b>
+          <b title="Pixelate"><svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="4"/><rect x="7" y="4" width="4" height="4"/><rect x="4" y="9" width="4" height="4"/><rect x="10" y="10" width="3" height="3"/></svg></b>
+          <hr>
+          <b title="Crop"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 1v10.5H15M1 4.5h10.5V15"/></svg></b>
+        </div>
+
+        <div class="stage">
+          <div class="sheet">
+            <div class="term">
+              <i style="width:54%"></i><i style="width:78%"></i><i style="width:41%"></i>
+              <i style="width:66%"></i><i style="width:88%"></i><i style="width:37%"></i>
+              <i style="width:72%"></i><i style="width:49%"></i><i style="width:61%"></i>
+            </div>
+            <div class="boxann" style="left:8%; top:44%; width:34%; height:17%"></div>
+            <div class="arrow"></div>
+            <div class="badge" style="left:70%; top:56%">1</div>
+            <div class="badge" style="left:82%; top:70%">2</div>
+          </div>
+
+          <div class="pill" style="left:50%; bottom:26px; transform:translateX(-50%)">
+            <div class="sw" style="background:var(--c1)"></div>
+            <div class="sw on" style="background:var(--c2)"></div>
+            <div class="sw" style="background:var(--c3)"></div>
+            <div class="sw" style="background:var(--c4)"></div>
+            <div class="sw" style="background:var(--ink)"></div>
+            <div class="div"></div>
+            <div class="track"></div>
+            <small>4 px</small>
+            <div class="div"></div>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <span>3 objects</span>
+        <div class="zoom"><u>&#8722;</u><span>100%</span><u>+</u></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div><span>6</span><p><b>The rail hugs its tools.</b>
+        <em>It currently stretches the full window height with fourteen icons floating in it. Grouping them by family — shapes, marks, effects, crop — and letting the container end gives the canvas the room back.</em></p></div>
+      <div><span>7</span><p><b>Copy lives here, and it has to.</b>
+        <em>Copy exists today only inside the preview screen. The editor has none, and <span style="font-family:var(--mono);font-size:12.5px">Key.C</span> is Crop. Removing the preview without this leaves no way to get a stored capture onto the clipboard at all.</em></p></div>
+      <div><span>8</span><p><b>The capture sits on a surface that is not the capture.</b>
+        <em>A checkered mat and a soft shadow, so a dark screenshot has a visible edge. Right now the canvas and a dark capture are the same black and the picture has no boundary.</em></p></div>
+      <div><span>9</span><p><b>The style pill follows the selection.</b>
+        <em>Colour, size and delete, floating near the object rather than in a permanent panel. It exists already — this is mostly about giving it somewhere legible to sit.</em></p></div>
+    </div>
+
+    <div class="flag">
+      <p style="margin:0"><b>One thing your request changes that is worth deciding on purpose.</b>
+      Going straight from the library to the editor deletes <span style="font-family:var(--mono);font-size:13px">PreviewView</span>
+      — a whole screen, which is a good deletion. But it also deletes the only Copy button in the app.
+      The proposal above puts Copy in two places: on the tile for a quick re-copy without opening anything,
+      and in the editor for after you have annotated. That is fewer clicks than today for both jobs.</p>
+    </div>
+  </div>
+
+</div>
