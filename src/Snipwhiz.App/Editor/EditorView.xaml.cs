@@ -125,6 +125,41 @@ public partial class EditorView : UserControl
             System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
+    /// <summary>
+    /// Put this capture on the clipboard. Raised rather than handled here, because
+    /// copying has to save first and the save pipeline belongs to the window above.
+    /// </summary>
+    public event Action? CopyRequested;
+
+    /// <summary>
+    /// Says something in the status line for a moment, then puts the object count
+    /// back.
+    ///
+    /// <para>Copy feedback has to appear here rather than in the library's footer,
+    /// which is on the other screen and not visible while editing.</para>
+    /// </summary>
+    public void Flash(string message)
+    {
+        StatusText.Text = message;
+
+        _flash ??= new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2.5),
+        };
+        _flash.Stop();
+        _flash.Tick -= OnFlashElapsed;
+        _flash.Tick += OnFlashElapsed;
+        _flash.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _flash;
+
+    private void OnFlashElapsed(object? sender, EventArgs e)
+    {
+        _flash!.Stop();
+        RefreshStatus();
+    }
+
     public void Save()
     {
         // Before anything reads the document. A text object mid-edit is drawing its
@@ -574,6 +609,7 @@ public partial class EditorView : UserControl
             case Key.S when !control: UseShape(SpotlightToolButton, () => new SpotlightAnnotation()); break;
             case Key.B when !control: UseShape(BlurToolButton, () => new BlurAnnotation()); break;
             case Key.P when !control: UseShape(PixelateToolButton, () => new PixelateAnnotation()); break;
+            case Key.C when control: CopyRequested?.Invoke(); break;
             case Key.C when !control: UseCrop(); break;
 
             case Key.Left: Nudge(-Step(shift), 0); break;

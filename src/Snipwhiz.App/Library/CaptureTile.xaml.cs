@@ -26,7 +26,41 @@ public partial class CaptureTile : System.Windows.Controls.UserControl
             e.Handled = true;
             if (DataContext is CaptureTileViewModel model) RemoveRequested?.Invoke(model.Record);
         };
+
+        CopyButton.Click += (_, e) => Raise(e, CopyRequested);
+        DeleteButton.Click += (_, e) => Raise(e, DeleteRequested);
+
+        // Shown on hover rather than always. A capture with no file has nothing to
+        // copy, so it keeps the Remove button and gets neither of these.
+        MouseEnter += (_, _) => HoverActions.Visibility =
+            DataContext is CaptureTileViewModel { IsMissing: false } ? Visibility.Visible : Visibility.Collapsed;
+        MouseLeave += (_, _) => HoverActions.Visibility = Visibility.Collapsed;
     }
+
+    /// <summary>
+    /// Both actions do the same two things: stop the click reaching the grid
+    /// handler, which would open the capture underneath, and report the record.
+    /// </summary>
+    private void Raise(RoutedEventArgs e, Action<CaptureRecord>? handler)
+    {
+        e.Handled = true;
+        if (DataContext is CaptureTileViewModel model) handler?.Invoke(model.Record);
+    }
+
+    /// <summary>
+    /// Copy this capture to the clipboard. Static for the same reason
+    /// <see cref="RemoveRequested"/> is: tiles come from a DataTemplate, so there
+    /// is no construction site to wire an instance event at.
+    ///
+    /// <para>This is the replacement for the preview screen's Copy button, and it
+    /// has to exist before that screen is deleted — <c>ClipboardCopier</c> is the
+    /// only path from a stored capture to the clipboard, and until now both of its
+    /// call sites lived inside the preview.</para>
+    /// </summary>
+    public static event Action<CaptureRecord>? CopyRequested;
+
+    /// <summary>Delete this capture, with the undo toast the library already shows.</summary>
+    public static event Action<CaptureRecord>? DeleteRequested;
 
     /// <summary>
     /// Raised for a capture whose original file is gone (spec 2a §4.12). Static

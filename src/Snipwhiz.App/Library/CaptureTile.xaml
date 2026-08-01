@@ -12,6 +12,53 @@
     -->
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+
+        <!--
+          The hover actions. Copy is the important one: it is the only way to get a
+          stored capture back onto the clipboard once the preview screen is gone,
+          and re-copying is the loop this whole product exists for.
+        -->
+        <Style x:Key="TileAction" TargetType="Button">
+            <Setter Property="Foreground" Value="#F5F2EC"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" CornerRadius="7"
+                                Background="#DC141312" BorderBrush="#33FFFFFF" BorderThickness="1"
+                                Padding="9,5">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#F2332F28"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TileActionPrimary" TargetType="Button" BasedOn="{StaticResource TileAction}">
+            <Setter Property="Foreground" Value="#1C1B1A"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" CornerRadius="7"
+                                Background="#E8833A" BorderThickness="0" Padding="9,5">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#F09A57"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Border x:Name="Card" CornerRadius="10" Padding="0"
@@ -59,6 +106,22 @@
                             Background="Transparent" BorderThickness="0"
                             Foreground="#E8833A" FontSize="11"
                             Margin="0,8,0,0" Padding="6,3" Cursor="Hand"/>
+                </StackPanel>
+
+                <!--
+                  Hidden until the pointer is over the tile, and hidden entirely for
+                  a capture whose file is gone - there is nothing to copy, and the
+                  only action that makes sense is the Remove button above.
+                -->
+                <StackPanel x:Name="HoverActions"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                            Margin="0,0,8,8"
+                            Visibility="Collapsed">
+                    <Button x:Name="DeleteButton" Content="Delete"
+                            Style="{StaticResource TileAction}" Margin="0,0,6,0"/>
+                    <Button x:Name="CopyButton" Content="Copy"
+                            Style="{StaticResource TileActionPrimary}"/>
                 </StackPanel>
             </Grid>
 

@@ -54,6 +54,36 @@ public class ClipboardFormatTests : IDisposable
         return System.Windows.Forms.Clipboard.GetDataObject()?.GetFormats(autoConvert: false) ?? [];
     });
 
+    /// <summary>
+    /// Writes, then reads back what is on the clipboard — retrying if the read does
+    /// not contain what was just written.
+    ///
+    /// <para>The clipboard is not merely process-global, it is <b>machine-global</b>.
+    /// The collection attribute below stops these tests racing each other, and can
+    /// do nothing about the rest of the computer: any application may take ownership
+    /// between the write and the read-back, and one did, roughly one solution run in
+    /// six.</para>
+    ///
+    /// <para>This does not weaken anything. The assertions are unchanged and an
+    /// implementation that genuinely fails to publish a format fails every attempt —
+    /// only a transient clobber by something else is tolerated. Tests that assert a
+    /// format is <i>absent</i> pass no expectations and so make a single attempt,
+    /// because there is nothing to wait for.</para>
+    /// </summary>
+    private static string[] Formats(Action write, params string[] expected)
+    {
+        string[] formats = [];
+
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            formats = OnStaThread(write);
+            if (expected.Length == 0 || expected.All(formats.Contains)) return formats;
+            Thread.Sleep(80);
+        }
+
+        return formats;
+    }
+
     [Fact]
     public void A_capture_is_published_as_png_dibv5_dib_and_a_file()
     {
@@ -61,7 +91,9 @@ public class ClipboardFormatTests : IDisposable
         var image = Image();
         File.WriteAllBytes(path, PngEncoder.Encode(image.Bgra, image.Width, image.Height));
 
-        var formats = OnStaThread(() => ClipboardWriter.Write(image, path));
+        var formats = Formats(
+            () => ClipboardWriter.Write(image, path),
+            "PNG", "Format17", "DeviceIndependentBitmap", "FileDrop");
 
         Assert.Contains("PNG", formats);
         // CF_DIBV5 has no friendly name in the managed enumeration.
@@ -91,7 +123,7 @@ public class ClipboardFormatTests : IDisposable
     [Fact]
     public void A_capture_with_no_file_still_publishes_the_image_formats()
     {
-        var formats = OnStaThread(() => ClipboardWriter.Write(Image(), filePath: null));
+        var formats = Formats(() => ClipboardWriter.Write(Image(), filePath: null), "PNG", "Format17");
 
         Assert.Contains("PNG", formats);
         Assert.Contains("Format17", formats);
@@ -104,8 +136,8 @@ public class ClipboardFormatTests : IDisposable
     {
         // Publishing a path to a file that was never written turns a missing
         // feature into a paste that fails inside the consumer.
-        var formats = OnStaThread(
-            () => ClipboardWriter.Write(Image(), Path.Combine(_dir, "never-written.png")));
+        var formats = Formats(
+            () => ClipboardWriter.Write(Image(), Path.Combine(_dir, "never-written.png")), "PNG");
 
         Assert.Contains("PNG", formats);
         Assert.DoesNotContain("FileDrop", formats);

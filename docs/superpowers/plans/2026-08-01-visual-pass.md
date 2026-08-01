@@ -27,18 +27,33 @@ is abandoned rather than shipped.
 
 **Files:** `Library/CaptureTile.xaml`, `Editor/EditorView.xaml`, `Library/ClipboardCopier.cs`.
 
-- [ ] **Step 1: Copy on the tile**, revealed on hover over the thumbnail, alongside
+- [x] **Step 1: Copy on the tile**, revealed on hover over the thumbnail, alongside
   Delete. Routed through `ClipboardCopier` — it is documented as the one and only
   path to the clipboard and that must stay true with three call sites, not two.
-- [ ] **Step 2: Copy in the editor**, in the top bar, and `Ctrl+C`. Note `Key.C`
-  without a modifier is Crop and stays that way.
-- [ ] **Step 3: Confirmation that is not a dialog.** The tray balloon already says
-  "Copied" for a fresh capture; reuse it rather than inventing a toast.
+- [x] **Step 2: Copy in the editor**, in the top bar, and `Ctrl+C`. `Key.C` without
+  a modifier is still Crop.
+- [x] **Step 3: Confirmation that is not a dialog.** *Deviated:* it goes in the
+  footer on the library screen and the status line in the editor, not the tray
+  balloon the plan named. A balloon is right for a capture taken while the window
+  is not on screen, and wrong for a click two inches from the pointer in a focused
+  window.
 
-**Verification:** copy from a tile and from the editor, paste into Paint and into a
-file picker — the second is what catches a broken `CF_HDROP`. **Negative control:**
-delete one of the two call sites and confirm the test fails, because a test that
-passes with Copy missing is the exact failure this task exists to prevent.
+**Editor Copy had to save first, and that is the whole task.** `ClipboardCopier`
+copies a *file*, and the editor has no dirty state by design — it writes on the way
+out. Copying the file as it stands would put the previous render on the clipboard
+and silently omit the last few annotations, which is worse than no Copy button
+because it looks like it worked. So it saves, waits for `SavePipeline` to commit,
+and copies what the commit produced. **Every failure path declines to copy rather
+than copying something stale** — including a save that succeeds while its render
+fails, where `Assets.Display` silently falls back to the un-annotated original.
+
+**A pre-existing flake surfaced and is fixed.** `ClipboardFormatTests` failed about
+one solution run in six: the clipboard is machine-global, the collection attribute
+only stops these tests racing *each other*, and any application can take ownership
+between the write and the read-back. The write-and-read pair now retries. Verified
+8 runs clean, and the control — demanding `FileDrop` from a write that publishes
+none — still fails in ~500 ms, so the retry tolerates a clobber without masking a
+defect.
 
 ---
 

@@ -60,6 +60,7 @@ public partial class LibraryWindow : Window
         EditTab.IsEnabled = false;
 
         UndoButton.Click += (_, _) => UndoLastDelete();
+        EditorCopyButton.Click += (_, _) => CopyFromEditor();
 
         // 200 ms after the last keystroke, not on every one — otherwise a typed
         // word runs a query per character and the grid flickers through them.
@@ -77,7 +78,14 @@ public partial class LibraryWindow : Window
         RowsHost.PreviewMouseLeftButtonUp += OnGridClick;
 
         CaptureTile.RemoveRequested += OnRemoveRequested;
-        Closed += (_, _) => CaptureTile.RemoveRequested -= OnRemoveRequested;
+        CaptureTile.CopyRequested += OnCopyRequested;
+        CaptureTile.DeleteRequested += Delete;
+        Closed += (_, _) =>
+        {
+            CaptureTile.RemoveRequested -= OnRemoveRequested;
+            CaptureTile.CopyRequested -= OnCopyRequested;
+            CaptureTile.DeleteRequested -= Delete;
+        };
 
         SourceInitialized += (_, _) =>
         {
@@ -152,6 +160,7 @@ public partial class LibraryWindow : Window
         {
             _editor = new Editor.EditorView(_store, _settings, _root);
             _editor.ExitRequested += ShowLibraryScreen;
+            _editor.CopyRequested += CopyFromEditor;
             _editor.SaveRequested += (r, d, s) => EditorSaveRequested?.Invoke(r, d, s);
             _editor.UrgentSaveRequested += (r, d) => EditorUrgentSaveRequested?.Invoke(r, d);
             EditorHost.Content = _editor;
@@ -178,6 +187,11 @@ public partial class LibraryWindow : Window
     /// </summary>
     public void OnEditSaved(CaptureRecord saved)
     {
+        // A copy is waiting on this save. Handing it the saved record rather than
+        // the one Copy was pressed against matters: this is the one carrying the
+        // FlatPath the render just produced.
+        _copyAfterSave?.TrySetResult(saved);
+
         _editor?.OnSaved(saved);
         if (Diagnostics.RefreshVerification.BreakRefresh) return;
         _model.Replace(saved);
@@ -196,6 +210,7 @@ public partial class LibraryWindow : Window
         EditorHost.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
 
         EditTab.IsEnabled = _editor?.Record is not null;
+        EditorCopyButton.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
         EditTabMark.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
         LibraryTabMark.Visibility = editing ? Visibility.Collapsed : Visibility.Visible;
         EditTab.Foreground = editing ? Ink : InkMuted;
@@ -236,6 +251,108 @@ public partial class LibraryWindow : Window
     /// crash between the two steps leaves an orphaned file — invisible and
     /// harmless — rather than an orphaned row, which is a visibly broken tile.
     /// </summary>
+    /// <summary>
+    /// Re-copy a stored capture, from the tile, without opening anything.
+    ///
+    /// <para>Through <see cref="ClipboardCopier"/> like every other copy in the
+    /// app. It resolves the <i>display</i> asset, so a capture that has been
+    /// annotated copies with its annotations rather than as the bare original.</para>
+    ///
+    /// <para>Confirmation goes in the footer rather than a balloon. The plan said
+    /// to reuse the tray balloon, which is right for a capture taken while the
+    /// window is not on screen and wrong here: this window is focused and under the
+    /// pointer, and a notification popping out of the system tray to report
+    /// something that happened two inches away is noise.</para>
+    /// </summary>
+    private async void OnCopyRequested(CaptureRecord record)
+    {
+        var result = await ClipboardCopier.CopyAsync(_store, record);
+
+        Flash(result switch
+        {
+            CopyResult.Copied => "Copied to the clipboard",
+            CopyResult.ClipboardUnavailable => "Another app is holding the clipboard. Try again.",
+            _ => "That capture's file could not be read.",
+        });
+    }
+
+    private TaskCompletionSource<CaptureRecord>? _copyAfterSave;
+
+    /// <summary>
+    /// Copy what is on the editor's canvas, including whatever was drawn a second
+    /// ago.
+    ///
+    /// <para><b>Save first, then copy what the save produced.</b> This is the whole
+    /// difficulty of the feature and the reason it is not one line.
+    /// <see cref="ClipboardCopier"/> copies the display asset — a file — and the
+    /// editor deliberately has no dirty state, writing only on the way out. Copying
+    /// the file as it stands would put the previous render on the clipboard and
+    /// silently omit the last few annotations, which is worse than having no Copy
+    /// button at all: it looks like it worked.</para>
+    ///
+    /// <para>Every failure path here declines to copy rather than copying something
+    /// stale. A render that fails still commits the project, and
+    /// <c>Assets.Display</c> then falls back to the un-annotated original — so a
+    /// missing <c>FlatPath</c> has to be treated as a failure even though the save
+    /// itself succeeded.</para>
+    /// </summary>
+    private async void CopyFromEditor()
+    {
+        if (_editor?.Record is null) return;
+
+        var wait = _copyAfterSave = new TaskCompletionSource<CaptureRecord>();
+        _editor.Save();
+
+        // A save that never commits must not hang this forever. The pipeline
+        // returns without committing when it cannot write the project at all.
+        var finished = await Task.WhenAny(wait.Task, Task.Delay(TimeSpan.FromSeconds(15)));
+        _copyAfterSave = null;
+
+        if (finished != wait.Task)
+        {
+            _editor.Flash("Couldn't save the edit, so nothing was copied.");
+            return;
+        }
+
+        var saved = wait.Task.Result;
+        if (saved.FlatPath is null)
+        {
+            _editor.Flash("Couldn't render the edit, so nothing was copied.");
+            return;
+        }
+
+        _editor.Flash(await ClipboardCopier.CopyAsync(_store, saved) switch
+        {
+            CopyResult.Copied => "Copied to the clipboard",
+            CopyResult.ClipboardUnavailable => "Another app is holding the clipboard. Try again.",
+            _ => "That capture's file could not be read.",
+        });
+    }
+
+    private DispatcherTimer? _flash;
+
+    /// <summary>
+    /// Says something in the footer for a moment, then puts the count back.
+    /// Restarted rather than stacked, so copying twice quickly does not restore
+    /// the footer while the second message is still up.
+    /// </summary>
+    private void Flash(string message)
+    {
+        Footer.Text = message;
+
+        _flash ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        _flash.Stop();
+        _flash.Tick -= OnFlashElapsed;
+        _flash.Tick += OnFlashElapsed;
+        _flash.Start();
+    }
+
+    private void OnFlashElapsed(object? sender, EventArgs e)
+    {
+        _flash!.Stop();
+        RefreshFooter();
+    }
+
     private void Delete(CaptureRecord record)
     {
         // Trivially reachable: open a capture, go back to Library, delete it. The

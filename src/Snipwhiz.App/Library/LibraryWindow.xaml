@@ -69,7 +69,26 @@
           view switch achieves that with one Mica surface, one Escape chain and
           one lifetime instead of two.
         -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="28,18,28,0">
+        <Grid Grid.Row="0" Margin="28,18,28,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!--
+              Copy, shown only while editing. It saves before it copies, because the
+              editor writes on the way out and copying the file as it stands would
+              silently omit whatever was just drawn. See LibraryWindow.CopyFromEditor.
+            -->
+            <Button x:Name="EditorCopyButton" Grid.Column="1"
+                    Content="Copy"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    Margin="0,0,0,4" Padding="18,7"
+                    Background="{StaticResource Accent}" BorderThickness="0"
+                    Foreground="#1C1B1A" FontSize="13" FontWeight="SemiBold"
+                    Cursor="Hand" Visibility="Collapsed"/>
+
+        <StackPanel Grid.Column="0" Orientation="Horizontal">
             <Button x:Name="LibraryTab" Content="Library"
                     Background="Transparent" BorderThickness="0"
                     Foreground="{StaticResource Ink}"
@@ -86,6 +105,7 @@
             <Border x:Name="EditTabMark" Width="30" Height="2" Background="{StaticResource Accent}"
                     VerticalAlignment="Bottom" Margin="-30,0,0,0" Visibility="Collapsed"/>
         </StackPanel>
+        </Grid>
 
     <Grid x:Name="RootContent" Grid.Row="1" Margin="28,14,28,16">
         <Grid.RowDefinitions>
