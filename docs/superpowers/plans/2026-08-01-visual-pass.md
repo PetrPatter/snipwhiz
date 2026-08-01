@@ -1,4 +1,4 @@
-# Visual pass — Implementation Plan
+﻿# Visual pass — Implementation Plan
 
 Spec: [`2026-08-01-visual-pass-design.md`](../specs/2026-08-01-visual-pass-design.md)
 Mockup: [`visual-pass.html`](../mockups/visual-pass.html)
@@ -68,6 +68,11 @@ Escape from the editor returns to the library; Escape again hides the window.
   The capture count moves up beside it, out of the footer.
 - [ ] **Step 4: The tab underline sizes itself.** It is currently `Width="46"` with
   `Margin="-46,0,0,0"`, hand-measured to the word "Library".
+- [ ] **Step 5: The marquee.** Four corner brackets in the icon's four colours,
+  scaling in from slightly oversized, on hover and on selection — spec §3.7. Four
+  `Border` elements with two sides each, on a `Storyboard`. **This replaces the
+  accent border**, which frees orange to mean "action" rather than doubling as
+  "selected".
 
 **Verification:** at 1100, 1400 and maximised, the tiles consume the full row width
 with no gutter. **Negative control:** restore the fixed width and confirm the
@@ -86,6 +91,9 @@ height is untouched, so it must still pass.
   instead of stretching the window height.
 - [ ] **Step 3: The style pill gets a legible ground.** Solid translucent, not
   frosted — WPF has no per-element backdrop blur and chasing one is wasted time.
+- [ ] **Step 4: The marquee on a selected annotation**, matching the library tile,
+  and reconciled with what the crop tool already draws. Three surfaces currently
+  draw a version of this shape and look unrelated; after this they are one motif.
 
 **Verification:** open a capture that is almost entirely black and confirm its edges
 are visible. **Negative control:** a deliberately white capture, since a mat tuned
@@ -130,7 +138,7 @@ that mattered in this project so far.
 
 - **No light theme**, so the app is wrong on a light desktop in exactly one place:
   the tray icon, which is why that one is bodiless and saturated.
-- **The style pill will not be frosted.** §3.7 of the spec.
+- **The style pill will not be frosted.** §3.8 of the spec.
 - **The overlay is untouched** and remains the least designed surface in the app.
 - **Small text will look slightly cruder than the mockup.** WPF sets 11–12px type
   heavier and less evenly than a browser, and no amount of work changes it.

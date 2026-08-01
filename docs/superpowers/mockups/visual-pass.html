@@ -130,8 +130,26 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
   cursor: pointer;
   transition: transform .16s cubic-bezier(.2,.8,.3,1), border-color .16s, background .16s;
 }
-.tile:hover { background: var(--raised-2); border-color: var(--accent); transform: translateY(-2px); }
+.tile:hover { background: var(--raised-2); transform: translateY(-2px); }
 .tile:focus-visible { outline: 2px solid var(--c4); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------------------
+   The signature.
+
+   A capture marquee locking onto its subject — the same four corners as the
+   icon, in the same four colours. This app's core gesture is dragging a
+   selection rectangle, so selection is the one thing worth spending an idea on,
+   and it is the only place in the interface that gets to be loud.
+
+   It replaces a plain accent border, which any dark utility app could have had.
+--------------------------------------------------------------------------- */
+.lock { position: absolute; inset: 0; pointer-events: none; opacity: 0; transform: scale(1.06); transition: opacity .16s, transform .18s cubic-bezier(.2,.8,.3,1); }
+.tile:hover .lock, .tile.sel .lock { opacity: 1; transform: none; }
+.lock i { position: absolute; width: 17px; height: 17px; }
+.lock i:nth-child(1) { left: 6px;  top: 6px;    border-left: 2.5px solid var(--c1); border-top: 2.5px solid var(--c1); border-top-left-radius: 3px; }
+.lock i:nth-child(2) { right: 6px; top: 6px;    border-right: 2.5px solid var(--c2); border-top: 2.5px solid var(--c2); border-top-right-radius: 3px; }
+.lock i:nth-child(3) { right: 6px; bottom: 6px; border-right: 2.5px solid var(--c3); border-bottom: 2.5px solid var(--c3); border-bottom-right-radius: 3px; }
+.lock i:nth-child(4) { left: 6px;  bottom: 6px; border-left: 2.5px solid var(--c4); border-bottom: 2.5px solid var(--c4); border-bottom-left-radius: 3px; }
 
 .shot {
   position: relative; height: 132px; overflow: hidden;
@@ -356,7 +374,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
             <i style="width:36%"></i><i style="width:64%"></i><i style="width:52%"></i>
             <i style="width:79%"></i><i style="width:41%"></i>
           </div></div>
-            <div class="actions">
+            <div class="lock"><i></i><i></i><i></i><i></i></div><div class="actions">
               <div class="act">Delete</div><div class="act primary">Copy</div>
             </div>
           </div>
@@ -369,7 +387,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
             <i style="width:69%"></i><i style="width:47%"></i><i style="width:76%"></i>
             <i style="width:33%"></i><i style="width:61%"></i>
           </div></div>
-            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+            <div class="lock"><i></i><i></i><i></i><i></i></div><div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
           </div>
           <div class="cap"><b>Code</b><time>10:33</time></div>
         </div>
@@ -379,7 +397,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
             <i></i><i style="width:84%"></i><i style="width:57%"></i>
             <i style="width:73%"></i><i style="width:44%"></i><i style="width:66%"></i>
           </div></div>
-            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+            <div class="lock"><i></i><i></i><i></i><i></i></div><div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
           </div>
           <div class="cap"><b>Firefox</b><time>10:19</time></div>
         </div>
@@ -390,7 +408,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
             <i style="width:71%"></i><i style="width:55%"></i><i style="width:80%"></i>
             <i style="width:38%"></i><i style="width:67%"></i>
           </div></div>
-            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+            <div class="lock"><i></i><i></i><i></i><i></i></div><div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
           </div>
           <div class="cap"><b>Snipwhiz</b><time>10:17</time></div>
         </div>
@@ -401,7 +419,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
             <i style="width:86%"></i><i style="width:51%"></i><i style="width:70%"></i>
             <i style="width:35%"></i><i style="width:59%"></i>
           </div></div>
-            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+            <div class="lock"><i></i><i></i><i></i><i></i></div><div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
           </div>
           <div class="cap"><b>Code</b><time>10:12</time></div>
         </div>
@@ -414,7 +432,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
             <i></i><i style="width:62%"></i><i style="width:81%"></i><i style="width:49%"></i>
             <i style="width:74%"></i><i style="width:56%"></i>
           </div></div>
-            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+            <div class="lock"><i></i><i></i><i></i><i></i></div><div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
           </div>
           <div class="cap"><b>Outlook</b><time>16:52</time></div>
         </div>
@@ -424,7 +442,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
             <i style="width:40%"></i><i style="width:75%"></i><i style="width:58%"></i>
             <i style="width:66%"></i><i style="width:44%"></i>
           </div></div>
-            <div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
+            <div class="lock"><i></i><i></i><i></i><i></i></div><div class="actions"><div class="act">Delete</div><div class="act primary">Copy</div></div>
           </div>
           <div class="cap"><b>WindowsTerminal</b><time>16:20</time></div>
         </div>

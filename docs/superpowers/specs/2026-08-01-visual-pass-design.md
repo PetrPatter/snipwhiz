@@ -1,4 +1,4 @@
-# Visual pass — Design Spec
+﻿# Visual pass — Design Spec
 
 **The library and the editor**, which are the two screens people spend time in.
 
@@ -115,7 +115,31 @@ drag, double-click-to-maximise, snap layouts on hover, and the right-click syste
 menu. Getting any of those wrong is worse than stock chrome, so they are gated
 individually.
 
-### 3.7 What the browser was flattering
+### 3.7 The signature: selection is a capture marquee
+
+**Everything else in this spec fixes a problem. This is the one part that adds an
+idea**, and the first draft of the mockup did not have one — it was a competent
+cleanup that could have belonged to any dark utility app.
+
+Selecting something shows **four corner brackets in the icon's four colours**,
+scaling in from slightly oversized like a viewfinder locking on. It appears on a
+hovered or selected library tile, on a selected annotation in the editor, and it
+is already what the crop tool draws.
+
+It earns its place by being the product's own vernacular rather than decoration.
+**Dragging a selection rectangle is what Snipwhiz is** — it is the first thing
+anyone does with it and the most repeated gesture in the app. Three surfaces
+already draw a version of this shape (the icon, the crop handles, the capture
+overlay) and they currently look unrelated; one motif unifies them for free.
+
+It also frees the accent. Orange currently means both "this is selected" and "this
+is the action", and pulling selection onto the marquee leaves orange to mean one
+thing: Copy, and the active tool.
+
+**Boldness is spent here and nowhere else.** Everything around it stays quiet —
+that is the point of having a signature rather than a theme.
+
+### 3.8 What the browser was flattering
 
 The mockup is HTML and some of it does not reach WPF. Recorded here so it is not
 discovered late and chased:
