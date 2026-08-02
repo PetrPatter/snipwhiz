@@ -8,11 +8,16 @@ blurred regions over it](assets/screenshot-editor.png)
 
 ## Install
 
-Download **Snipwhiz-Setup.exe** from the [latest release](../../releases/latest) and
-run it.
+Download **SnipwhizApp-win-Setup.exe** from the
+[latest release](../../releases/latest) and run it.
 
 No admin rights, no options to choose, nothing to configure. It installs for your
 account only and puts an icon in your system tray.
+
+**On a managed work machine, take `SnipwhizApp-win-Portable.zip` instead.** Unzip it
+anywhere and run the exe — no installer, no registry, nothing to uninstall, and it
+never checks for updates. Fleets commonly forbid unsigned programs from running out
+of `%LOCALAPPDATA%`, which is where the installer puts this one.
 
 ### Windows will try to stop you, and it's wrong
 
