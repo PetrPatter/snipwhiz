@@ -203,9 +203,9 @@ that does not snap is worse than a caption that is not ours.
 
 **Done, by hand on the dev machine:** drag, double-click to maximise and restore,
 Snap Layouts on hover, right-click system menu, and no content clipped at the edges
-when maximised. **Not yet run in Sandbox on a clean install** — none of this is
-install-dependent, but the plan asked for it and it has not happened. Folded into the
-Sandbox session D6 needs anyway.
+when maximised. **And now on a clean install too**, in the Sandbox session D6 needed
+anyway — all four behaved identically there, which is the answer the plan wanted
+rather than the answer it assumed.
 
 **It found a defect that had nothing to do with chrome.** Double-clicking the caption
 maximised the window *and* opened a random capture in the editor. The grid was acting

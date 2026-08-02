@@ -206,16 +206,30 @@ prevented or revealed it. Only a real install and a real uninstall could.
 
 **The first irreversible step.** Everything above is checkable privately.
 
-- [ ] **Step 1: Review what is about to become public.** Every file, the whole
+- [x] **Step 1: Review what is about to become public.** Every file, the whole
   commit history, and the spec documents. Nothing secret is expected — certificates
   have always been gitignored — but "expected" is not "checked", and the check is
   cheap compared to a force-push after the fact.
-- [ ] **Step 2: Create the repository and push.**
-- [ ] **Step 3: A README** with the download link, one editor screenshot, the
+- [x] **Step 2: Create the repository and push.**
+- [x] **Step 3: A README** with the download link, one editor screenshot, the
   hotkey, and a plain paragraph about the SmartScreen warning and why it appears.
 
 **Verification:** a search of the full history for key material, tokens and
 absolute paths containing the user's name, before the push and not after.
+
+**Clean.** The full history across every branch turned up no key material, no
+tokens and no absolute paths naming the user; the only matches were prose about the
+redaction tool and the gitignore line that excludes certificates. `Releases/` and
+`publish/` are ignored and have never been tracked, so the 86 MB artifacts were
+never in a commit to find.
+
+**The screenshot argued for a retake, twice, and the third one earned its place.**
+The first showed annotations floating on an empty canvas — drawing tools over
+nothing, which reads as a drawing app. The second put them on a real capture and
+published the user's Start menu recents and live news headlines along with it. The
+third redacts those with the editor's own blur, which is the one claim in the README
+that prose cannot make: a screenshot tool whose front page shows its redaction
+working is doing more than describing itself.
 
 ---
 
@@ -223,14 +237,14 @@ absolute paths containing the user's name, before the push and not after.
 
 **Files:** `src/Snipwhiz.App/Update/`, `scripts/release.ps1`.
 
-- [ ] **Step 1: Publish 1.0.0** to GitHub Releases.
-- [ ] **Step 2: Check on start, apply on restart.** After the window is up, never
+- [x] **Step 1: Publish 1.0.0** to GitHub Releases.
+- [x] **Step 2: Check on start, apply on restart.** After the window is up, never
   before — spec 1 spent real effort making capture instant and an update check on
   the startup path would spend it back.
-- [ ] **Step 3: Silent on failure.** No network, a rate-limited GitHub, a corporate
+- [x] **Step 3: Silent on failure.** No network, a rate-limited GitHub, a corporate
   proxy — all ordinary, none worth a dialog about a problem the user cannot fix and
   does not have.
-- [ ] **Step 4: A quiet "restart to finish updating" affordance**, and nothing else.
+- [x] **Step 4: A quiet "restart to finish updating" affordance**, and nothing else.
   No changelog window, no "what's new", no nagging.
 
 **Verification:** install 1.0.0, publish 1.0.1, launch, confirm it updates and
@@ -245,6 +259,41 @@ version bump.
 different claims — see `CONTEXT.md`. A failed update leaves you on the version you
 already had, which is what a corrupt payload produces. Nothing here returns the app
 to an older version after a newer one has installed.
+
+**All four gates passed, in two Sandbox sessions, by hand.** 1.0.0 installed from a
+mapped Setup.exe, two captures taken, then 1.0.1 found, downloaded as a 176 KB delta
+against an 82 MB full package, and applied on exit — with both captures still in the
+library afterwards and `%LOCALAPPDATA%\Snipwhiz` unchanged across the version bump.
+The corrupt 1.0.2 produced nothing at all: no restart item, no dialog, no error, and
+the app still reporting 1.0.1. The second session, with `<Networking>Disable</Networking>`
+in the `.wsb`, behaved exactly as an ordinary launch.
+
+**No escape hatch was added to do this.** An environment variable pointing the
+updater at a local feed was written and then reverted: Sandbox's own networking
+toggle is not a simulation of an unreachable feed, it *is* one, and a repository
+with zero downloads is a place where publishing a broken build and deleting it costs
+nothing. The shipped 1.0.0 contains no way to redirect where it fetches code from.
+
+**The rollback control passed falsely on the first attempt, and the reason
+generalises.** The packages were corrupted before upload — and `vpk upload`
+regenerates `releases.win.json` from the files as it finds them, so the manifest
+agreed with the corruption and the integrity check would have been satisfied by it.
+Both packages had to be corrupted a *second* time and re-uploaded over the assets,
+leaving the published manifest holding the first corruption's hashes. **A negative
+control that goes through the same tool as the positive path is not a control** —
+the tool will make it consistent. Verified by fetching the served asset and the
+served manifest independently and confirming they disagree at an unchanged file size.
+
+**Both packages, not just the delta.** Corrupting only the delta would have let
+Velopack fall back to the full package and succeed, which looks identical to a
+passing positive gate.
+
+**1.0.0's tag was nearly wrong, and that is the quiet one.** The draft release
+targeted `main`, which was twelve commits behind the code the artifacts were built
+from — publishing it would have created a `v1.0.0` tag naming pre-visual-pass source
+next to a post-visual-pass installer, on the one release anyone ever looks at
+closely. `main` was fast-forwarded and the artifacts rebuilt from the pushed commit
+before the tag existed.
 
 ---
 
