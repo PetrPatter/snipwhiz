@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Snipwhiz.App.Library"
         xmlns:core="clr-namespace:Snipwhiz.Core.Storage;assembly=Snipwhiz.Core"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Snipwhiz Library"
         Width="1100" Height="720"
         MinWidth="620" MinHeight="420"
@@ -11,6 +12,28 @@
         UseLayoutRounding="True"
 
         Background="Transparent">
+
+    <!--
+      A real caption height, not the zero the plan asked for.
+
+      Zero is the obvious way to get an app-drawn title bar and it is the expensive
+      one: it tells Windows this window has no caption at all, and drag,
+      double-click-to-maximise and the right-click system menu are things Windows
+      does *to a caption*. Losing all three and reimplementing them with DragMove is
+      how a custom title bar ends up worse than the stock one it replaced.
+
+      Given a height instead, the top 56px behave like a caption and those three
+      arrive for free. Anything up there that is a control rather than background -
+      the tabs, Copy, minimise, close - opts out with IsHitTestVisibleInChrome. The
+      maximise button deliberately does not; see CaptionChrome.
+    -->
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="56"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
 
     <!--
       Transparent, and explicitly so. An opaque brush is painted across the whole
@@ -27,6 +50,60 @@
         <SolidColorBrush x:Key="Ink" Color="#F5F2EC"/>
         <SolidColorBrush x:Key="InkMuted" Color="#8F8A80"/>
         <SolidColorBrush x:Key="Accent" Color="#E8833A"/>
+
+        <!--
+          The window buttons. Sized to Windows' own 46x32 rather than to this app's
+          taste: these are the three controls a person operates without looking, and
+          the muscle memory is for the standard target, in the standard order, in the
+          standard corner. The only liberty taken is the colour.
+        -->
+        <Style x:Key="CaptionButton" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#1AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#0DFFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Red on hover, because that is what Close does everywhere else in Windows
+             and a close button that does not is a close button you hesitate over. -->
+        <Style x:Key="CaptionClose" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#C42B1C"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#B01F12"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- Implicit templates: the ContentPresenter for each row picks by type. -->
         <DataTemplate DataType="{x:Type core:DayHeaderRow}">
@@ -69,10 +146,18 @@
           view switch achieves that with one Mica surface, one Escape chain and
           one lifetime instead of two.
         -->
-        <Grid Grid.Row="0" Margin="28,18,28,0">
+        <!--
+          The caption. Everything in this row is either a control that opts out of the
+          chrome, or background you can drag the window by - there is no separate
+          title bar above it, which is the whole point: the tabs already say what this
+          window is, so a strip repeating "Snipwhiz Library" above them would be 32px
+          of vertical space spent on a label nobody reads.
+        -->
+        <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <!--
@@ -83,39 +168,73 @@
             <Button x:Name="EditorCopyButton" Grid.Column="1"
                     Content="Copy"
                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                    Margin="0,0,0,4" Padding="18,7"
+                    Margin="0,0,18,4" Padding="18,7"
                     Background="{StaticResource Accent}" BorderThickness="0"
                     Foreground="#1C1B1A" FontSize="13" FontWeight="SemiBold"
-                    Cursor="Hand" Visibility="Collapsed"/>
+                    Cursor="Hand" Visibility="Collapsed"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
-        <!--
-          The underline is a bottom border on the button, so it is exactly as wide
-          as the word. It used to be a separate Border of Width="46" pulled back
-          under the button with Margin="-46,0,0,0" - hand-measured to fit "Library",
-          and wrong the moment the text, the font or the size changed.
-        -->
-        <StackPanel Grid.Column="0" Orientation="Horizontal">
-            <StackPanel>
-                <Button x:Name="LibraryTab" Content="Library"
-                        Background="Transparent" BorderThickness="0"
-                        Foreground="{StaticResource Ink}"
-                        FontSize="22" FontWeight="SemiBold"
-                        Padding="0,0,0,6" Cursor="Hand"/>
-                <Border x:Name="LibraryTabMark" Height="2" Background="{StaticResource Accent}"
-                        Width="{Binding ActualWidth, ElementName=LibraryTab}"/>
+            <!--
+              The underline is a bottom border on the button, so it is exactly as wide
+              as the word. It used to be a separate Border of Width="46" pulled back
+              under the button with Margin="-46,0,0,0" - hand-measured to fit "Library",
+              and wrong the moment the text, the font or the size changed.
+            -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="28,16,0,0"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                <!-- The mark, at the size it was drawn for rather than a downscaled
+                     256. Identity in the corner is the one thing the stock caption
+                     was carrying that this row would otherwise drop. -->
+                <Image Source="pack://application:,,,/Snipwhiz.ico"
+                       Width="22" Height="22" Margin="0,0,14,8"
+                       VerticalAlignment="Bottom"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                <StackPanel>
+                    <Button x:Name="LibraryTab" Content="Library"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{StaticResource Ink}"
+                            FontSize="22" FontWeight="SemiBold"
+                            Padding="0,0,0,6" Cursor="Hand"/>
+                    <Border x:Name="LibraryTabMark" Height="2" Background="{StaticResource Accent}"
+                            Width="{Binding ActualWidth, ElementName=LibraryTab}"/>
+                </StackPanel>
+
+                <StackPanel Margin="26,0,0,0">
+                    <Button x:Name="EditTab" Content="Edit"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{StaticResource InkMuted}"
+                            FontSize="22" FontWeight="SemiBold"
+                            Padding="0,0,0,6" Cursor="Hand"/>
+                    <Border x:Name="EditTabMark" Height="2" Background="{StaticResource Accent}"
+                            Width="{Binding ActualWidth, ElementName=EditTab}"
+                            Visibility="Collapsed"/>
+                </StackPanel>
             </StackPanel>
 
-            <StackPanel Margin="26,0,0,0">
-                <Button x:Name="EditTab" Content="Edit"
-                        Background="Transparent" BorderThickness="0"
-                        Foreground="{StaticResource InkMuted}"
-                        FontSize="22" FontWeight="SemiBold"
-                        Padding="0,0,0,6" Cursor="Hand"/>
-                <Border x:Name="EditTabMark" Height="2" Background="{StaticResource Accent}"
-                        Width="{Binding ActualWidth, ElementName=EditTab}"
-                        Visibility="Collapsed"/>
+            <!--
+              Flush into the corner, where Windows puts them and where the pointer is
+              thrown rather than aimed. Minimise and close opt out of the chrome so WPF
+              handles them normally; maximise does NOT, because Windows only offers the
+              Snap Layouts flyout to a window that answers WM_NCHITTEST with
+              HTMAXBUTTON - and a button WPF is hit-testing never gets the chance to.
+              CaptionChrome drives its hover and its click instead.
+            -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button x:Name="MinimiseButton" Content="&#xE921;"
+                        Style="{StaticResource CaptionButton}"
+                        ToolTip="Minimise"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+                <Button x:Name="MaximiseButton" Content="&#xE922;"
+                        Style="{StaticResource CaptionButton}"
+                        Background="Transparent"/>
+
+                <Button x:Name="CloseButton" Content="&#xE8BB;"
+                        Style="{StaticResource CaptionClose}"
+                        ToolTip="Close"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
             </StackPanel>
-        </StackPanel>
         </Grid>
 
     <Grid x:Name="RootContent" Grid.Row="1" Margin="28,14,28,16">

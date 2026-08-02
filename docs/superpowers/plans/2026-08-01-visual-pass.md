@@ -170,15 +170,52 @@ task's scope and both real:
 
 **The only task that can fail worse than not doing it.**
 
-- [ ] **Step 1: `WindowChrome` with a zero-height caption**, app-drawn bar carrying
-  the icon, the title and the window controls.
-- [ ] **Step 2: Restore what stock chrome gave for free** — drag, double-click to
+- [x] **Step 1: `WindowChrome` with a zero-height caption**, app-drawn bar carrying
+  the icon, the title and the window controls. ***Deviated: the caption is 56px, not
+  zero, and this is the whole reason the task survived.*** Zero is the obvious way to
+  get an app-drawn title bar and it is the expensive one — it tells Windows the window
+  has no caption, and drag, double-click-to-maximise and the right-click system menu
+  are all things Windows does *to a caption*. Step 2 would then have meant
+  reimplementing three OS behaviours with `DragMove`, which is exactly how a custom
+  title bar ends up worse than the stock one it replaced. Given a real height, the
+  three arrive free and each control opts out individually with
+  `IsHitTestVisibleInChrome`.
+
+  There is no separate title strip: the tabs already say what the window is, so a bar
+  repeating "Snipwhiz Library" above them would be 32px of height spent on a label
+  nobody reads. The app icon moved inline, to the left of the tabs — identity in the
+  corner was the one thing the stock caption carried that this row would have dropped.
+- [x] **Step 2: Restore what stock chrome gave for free** — drag, double-click to
   maximise, snap layouts on hover, and the right-click system menu.
+
+**Snap Layouts is the only one that needed real work**, and it is the reason
+`CaptionChrome` exists. Windows offers that flyout to a window that answers
+`WM_NCHITTEST` with `HTMAXBUTTON`; a WPF button in the caption answers `HTCAPTION`
+like everything else up there. **So the maximise button is deliberately not
+hit-test-visible to WPF** — you cannot have both, and once Windows owns the hit-test
+it owns the whole interaction, which is why that button's hover highlight and its
+click are driven from code rather than from a style trigger.
 
 **Verification:** each of those four by hand, in Sandbox, on a clean install.
 **Negative control:** none needed — the failure is visible immediately. **If any of
 the four cannot be made right, revert to stock chrome and record why.** A caption
 that does not snap is worse than a caption that is not ours.
+
+**Done, by hand on the dev machine:** drag, double-click to maximise and restore,
+Snap Layouts on hover, right-click system menu, and no content clipped at the edges
+when maximised. **Not yet run in Sandbox on a clean install** — none of this is
+install-dependent, but the plan asked for it and it has not happened. Folded into the
+Sandbox session D6 needs anyway.
+
+**It found a defect that had nothing to do with chrome.** Double-clicking the caption
+maximised the window *and* opened a random capture in the editor. The grid was acting
+on a **mouse-up alone**, never checking that the press had landed on the same tile —
+and maximising moves the window out from under the pointer, so a press in the title
+bar of a centred window releases several hundred pixels down a maximised one, over the
+grid. Press and release must now match. That also fixes the quieter case nobody
+reported: pressing a tile, dragging away and releasing used to open whatever was under
+the release. **Verified by hand only** — pinning it would mean standing up a store, a
+thumbnail cache and two view models to assert one reference comparison.
 
 ---
 
@@ -201,6 +238,12 @@ that mattered in this project so far.
 
 ## Known gaps, recorded rather than solved
 
+- **Mica is gone from the library window**, and that is a trade rather than a bug.
+  `WindowChrome` with `GlassFrameThickness="0"` stops DWM drawing the backdrop into
+  the client area, so the window no longer tints with the wallpaper — it is flat.
+  Accepted deliberately: the frameless caption is worth more than the tint, and the
+  scrim the window was already wearing over Mica meant the difference is small.
+  `GlassFrameThickness="-1"` is the thing to try if it is ever wanted back.
 - **No light theme**, so the app is wrong on a light desktop in exactly one place:
   the tray icon, which is why that one is bodiless and saturated.
 - **The style pill will not be frosted.** §3.8 of the spec.

@@ -75,6 +75,7 @@ public partial class LibraryWindow : Window
 
         // One handler for every tile rather than plumbing a click event through
         // the templates: find the tile the click landed in and open it.
+        RowsHost.PreviewMouseLeftButtonDown += OnGridPress;
         RowsHost.PreviewMouseLeftButtonUp += OnGridClick;
 
         CaptureTile.RemoveRequested += OnRemoveRequested;
@@ -86,6 +87,10 @@ public partial class LibraryWindow : Window
             CaptureTile.CopyRequested -= OnCopyRequested;
             CaptureTile.DeleteRequested -= Delete;
         };
+
+        MinimiseButton.Click += (_, _) => SystemCommands.MinimizeWindow(this);
+        CloseButton.Click += (_, _) => Close();
+        StateChanged += (_, _) => SyncMaximiseButton();
 
         SourceInitialized += (_, _) =>
         {
@@ -99,6 +104,13 @@ public partial class LibraryWindow : Window
             // So hiding for a capture is instant rather than a fade the grab can
             // catch halfway through.
             Mica.DisableTransitions(hwnd);
+
+            // Here and not earlier: there is no HwndSource to hook until the window
+            // has one.
+            CaptionChrome.Install(this, MaximiseButton, hovered =>
+                MaximiseButton.Background = hovered ? MaximiseHover : Brushes.Transparent);
+
+            SyncMaximiseButton();
         };
 
         Loaded += (_, _) =>
@@ -137,6 +149,38 @@ public partial class LibraryWindow : Window
 
     private ScrollViewer? _scroller;
     private readonly DispatcherTimer _searchDebounce;
+
+    /// <summary>
+    /// The maximise button's hover fill, set from code because the button never sees
+    /// the mouse — Windows owns its hit-testing so Snap Layouts can work at all. Same
+    /// value as the CaptionButton style's trigger; the two must not drift.
+    /// </summary>
+    private static readonly Brush MaximiseHover = Freeze(
+        new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF)));
+
+    private static Brush Freeze(Brush brush)
+    {
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>
+    /// Swaps the glyph and the tooltip between maximise and restore.
+    ///
+    /// <para>Driven by <c>StateChanged</c> rather than by the click handler, so it is
+    /// still right after the routes that never touch the button: double-clicking the
+    /// caption, dragging the window to a screen edge, Win+Up, and a Snap Layouts
+    /// choice — which is the one this button exists to enable.</para>
+    /// </summary>
+    private void SyncMaximiseButton()
+    {
+        var maximised = WindowState == WindowState.Maximized;
+        // Escaped, not pasted. These are private-use codepoints in Segoe MDL2
+        // Assets, and a literal glyph in the source is one encoding mishap away from
+        // becoming a box - which this repo has already had once, in Program.cs.
+        MaximiseButton.Content = maximised ? "\uE923" : "\uE922";   // restore / maximise
+        MaximiseButton.ToolTip = maximised ? "Restore" : "Maximise";
+    }
 
     /// <summary>
     /// A capture taken while this window is open, inserted without a re-query —
@@ -482,19 +526,37 @@ public partial class LibraryWindow : Window
         UndoToast.Visibility = Visibility.Visible;
     }
 
+    /// <summary>
+    /// The tile a press landed on, so the release can be checked against it.
+    ///
+    /// <para>Cleared on every release, so a press that ends anywhere else — outside
+    /// the window, on another tile, on nothing — opens nothing.</para>
+    /// </summary>
+    private CaptureTileViewModel? _pressedTile;
+
+    private void OnGridPress(object sender, MouseButtonEventArgs e) => _pressedTile = TileAt(e);
+
+    /// <summary>
+    /// Opens a capture, but only when the press and the release were on the same tile.
+    ///
+    /// <para><b>A release on its own is not a click, and treating it as one was a real
+    /// defect.</b> Double-clicking the caption to maximise moves the window out from
+    /// under the pointer: the press happens in the title bar of a centred window and
+    /// the release happens at the same point on screen, which by then is several
+    /// hundred pixels down a maximised one — over the grid. The library would open
+    /// whichever capture had slid under the mouse.</para>
+    ///
+    /// <para>Pairing them also fixes the quieter version of the same thing: pressing a
+    /// tile, changing your mind, dragging away and releasing used to open whatever was
+    /// under the release.</para>
+    /// </summary>
     private void OnGridClick(object sender, MouseButtonEventArgs e)
     {
-        // A click on one of the tile's own buttons is not a click on the tile.
-        //
-        // This has to be decided here rather than in the button's Click handler,
-        // which is where it was first tried and does not work: Click bubbles, and
-        // this is a Preview handler that tunnels, so the grid has already acted by
-        // the time the button hears about it. Marking the args handled in Click is
-        // marking them after the fact.
-        if (FindAncestor<System.Windows.Controls.Button>(e.OriginalSource as DependencyObject) is not null) return;
+        var model = TileAt(e);
+        var pressed = _pressedTile;
+        _pressedTile = null;
 
-        var tile = FindAncestor<CaptureTile>(e.OriginalSource as DependencyObject);
-        if (tile?.DataContext is not CaptureTileViewModel model) return;
+        if (model is null || !ReferenceEquals(model, pressed)) return;
 
         // A capture with no file has nothing to open; its only action is to remove
         // the row, which the tile itself offers.
@@ -506,6 +568,24 @@ public partial class LibraryWindow : Window
         // now reachable without it: Copy and Delete on the tile, and editing is
         // what a click on a capture most likely meant.
         EditRequested?.Invoke(model.Record);
+    }
+
+    /// <summary>
+    /// The tile under a mouse event, or null — including for the tile's own buttons,
+    /// which are not the tile.
+    ///
+    /// <para>The button check has to happen here rather than in the button's Click
+    /// handler, which is where it was first tried and does not work: Click bubbles,
+    /// and these are Preview handlers that tunnel, so the grid has already acted by
+    /// the time the button hears about it. Marking the args handled in Click is
+    /// marking them after the fact.</para>
+    /// </summary>
+    private static CaptureTileViewModel? TileAt(MouseButtonEventArgs e)
+    {
+        var source = e.OriginalSource as DependencyObject;
+        if (FindAncestor<System.Windows.Controls.Button>(source) is not null) return null;
+
+        return FindAncestor<CaptureTile>(source)?.DataContext as CaptureTileViewModel;
     }
 
     /// <summary>
