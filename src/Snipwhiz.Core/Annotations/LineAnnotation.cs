@@ -40,6 +40,47 @@ public class LineAnnotation : Annotation
         Transform = new Matrix(1, 0, 0, 1, (from.X + to.X) / 2, (from.Y + to.Y) / 2);
     }
 
+    /// <summary>
+    /// A line is edited by its two ends and nothing else.
+    ///
+    /// <para>The box handles are still <i>correct</i> — <see cref="GeometryForBounds"/>
+    /// below exists to make them so — but a corner handle can only stretch the line
+    /// within the quadrant it already occupies. It cannot drag an end past the other
+    /// one, which is how you reverse an arrow, and it cannot be told apart from the
+    /// five other handles that do less. Two ends can.</para>
+    /// </summary>
+    public override bool HasBoundingBox => false;
+
+    public override IReadOnlyList<HandleKind> ControlPoints => [HandleKind.Start, HandleKind.End];
+
+    public override Point ControlPoint(HandleKind kind) => kind switch
+    {
+        HandleKind.Start => Start,
+        HandleKind.End => End,
+        _ => base.ControlPoint(kind),
+    };
+
+    /// <summary>
+    /// Puts one end on a point and leaves the other alone.
+    ///
+    /// <para>Both ends are derived from <see cref="Delta"/> about the midpoint, so
+    /// moving one end moves the midpoint too — and the midpoint is the object's own
+    /// origin. This returns only the new vector; pinning the far end back where it
+    /// was in image space is the caller's half, driven by
+    /// <see cref="Handles.Opposite"/> saying these two ends are opposite each other.
+    /// Without that half the line would slide as well as stretch.</para>
+    ///
+    /// <para>Unlike a resize this can take an end straight through the other, which
+    /// flips the vector's sign and reverses the arrowhead — the gesture the box
+    /// handles could not express.</para>
+    /// </summary>
+    public override GeometryState? MoveControlPoint(HandleKind kind, Point local) => kind switch
+    {
+        HandleKind.Start => new LineGeometryState(End - local),
+        HandleKind.End => new LineGeometryState(local - Start),
+        _ => base.MoveControlPoint(kind, local),
+    };
+
     public override GeometryState CaptureGeometry() => new LineGeometryState(Delta);
 
     public override void RestoreGeometry(GeometryState state) =>

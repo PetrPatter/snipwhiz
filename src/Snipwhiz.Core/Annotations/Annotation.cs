@@ -157,6 +157,19 @@ public abstract class Annotation
     public virtual IReadOnlyList<HandleKind> ControlPoints => [];
 
     /// <summary>
+    /// Whether this object is edited through the eight box handles and the rotate
+    /// arm, or only through its own <see cref="ControlPoints"/>.
+    ///
+    /// <para>True for everything with an area. False for a line and an arrow, where
+    /// the box is a lie about the shape: a diagonal line got a rectangle with eight
+    /// handles and a rotate arm, six of which did something that had no meaning for a
+    /// line, and none of which was the obvious gesture of picking up an end and
+    /// putting it somewhere else. Dragging an end already rotates and resizes it, so
+    /// the rest of the apparatus was ceremony around the thing you actually wanted.</para>
+    /// </summary>
+    public virtual bool HasBoundingBox => true;
+
+    /// <summary>
     /// Where one of <see cref="ControlPoints"/> sits, in this object's own space.
     ///
     /// <para>The origin by default, which is the centre — <see cref="LocalBounds"/>

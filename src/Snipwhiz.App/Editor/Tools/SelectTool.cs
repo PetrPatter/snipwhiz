@@ -202,11 +202,20 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
     }
 
     /// <summary>
-    /// Drags a control point — today only a callout's tail.
+    /// Drags a control point: a callout's tail, or one end of a line.
     ///
-    /// <para>A <see cref="ReshapeAnnotation"/>, not a resize: the object's bounds and
-    /// transform do not move, only its own idea of its shape. That is also what makes
-    /// the whole drag one undo step, since reshapes absorb.</para>
+    /// <para><b>The start geometry goes back on first, every frame.</b> The pointer
+    /// arrives in the frame the gesture began in, and an object that reads its own
+    /// current shape to answer — a line asking where its other end is — would be
+    /// mixing this frame's coordinates with last frame's geometry, and the answer
+    /// compounds. <see cref="Handles.Settle"/> does the same thing for the same
+    /// reason.</para>
+    ///
+    /// <para>A tail moves nothing but the object's idea of its own shape, so it is a
+    /// <see cref="ReshapeAnnotation"/> and the transform is left alone. A line's end
+    /// moves the midpoint, which <i>is</i> the object's origin, so the frame has to be
+    /// re-anchored onto the end that did not move or the whole line slides. Whether an
+    /// object needs that is exactly whether its control point has an opposite.</para>
     /// </summary>
     private void DragControlPoint(Point image)
     {
@@ -216,9 +225,25 @@ internal sealed class SelectTool(CanvasHost canvas, SceneDocument document, Undo
         if (!inverse.HasInverse) return;
         inverse.Invert();
 
+        _target.RestoreGeometry(_startGeometry);
         if (_target.MoveControlPoint(_handle, inverse.Transform(image)) is not { } moved) return;
 
-        undo.Apply(new ReshapeAnnotation(_target, _startGeometry, moved));
+        var anchor = Handles.Opposite(_handle);
+        if (anchor is HandleKind.None)
+        {
+            undo.Apply(new ReshapeAnnotation(_target, _startGeometry, moved));
+        }
+        else
+        {
+            // The new shape has to be on the object before it can be asked where the
+            // anchored end now sits in its own frame.
+            _target.RestoreGeometry(moved);
+            var transform = Handles.Anchored(
+                _startTransform, Handles.LocalPosition(_target, anchor, 0), _anchorImage);
+
+            undo.Apply(new ResizeAnnotation(_target, _startGeometry, _startTransform, moved, transform));
+        }
+
         canvas.Invalidate(_target);
         canvas.RefreshOverlay();
     }

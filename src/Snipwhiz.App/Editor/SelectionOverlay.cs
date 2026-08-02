@@ -59,7 +59,12 @@ internal static class SelectionOverlay
         // selected while the area around it is dimmed.
         if (canvas.CropPreview is { } crop) DrawCrop(dc, canvas, crop);
 
-        foreach (var annotation in selection) DrawOutline(dc, canvas, annotation);
+        // A line has no box, so it gets no outline. Its two ends are drawn below as
+        // control points and they are the whole of its selection.
+        foreach (var annotation in selection)
+        {
+            if (annotation.HasBoundingBox) DrawOutline(dc, canvas, annotation);
+        }
 
         // Handles only for a single selection. With several selected the useful
         // gesture is move, and eight handles per object is noise that hides it.
@@ -161,16 +166,19 @@ internal static class SelectionOverlay
 
     private static void DrawHandles(DrawingContext dc, CanvasHost canvas, Annotation annotation)
     {
-        var top = Position(canvas, annotation, HandleKind.Top);
-        var rotate = Position(canvas, annotation, HandleKind.Rotate);
-        dc.DrawLine(RotateArm, top, rotate);
-        dc.DrawEllipse(HandleFill, HandleEdge, rotate, HandleSize / 2, HandleSize / 2);
-
-        foreach (var kind in Handles.Resizers)
+        if (annotation.HasBoundingBox)
         {
-            var centre = Position(canvas, annotation, kind);
-            dc.DrawRectangle(HandleFill, HandleEdge, new Rect(
-                centre.X - HandleSize / 2, centre.Y - HandleSize / 2, HandleSize, HandleSize));
+            var top = Position(canvas, annotation, HandleKind.Top);
+            var rotate = Position(canvas, annotation, HandleKind.Rotate);
+            dc.DrawLine(RotateArm, top, rotate);
+            dc.DrawEllipse(HandleFill, HandleEdge, rotate, HandleSize / 2, HandleSize / 2);
+
+            foreach (var kind in Handles.Resizers)
+            {
+                var centre = Position(canvas, annotation, kind);
+                dc.DrawRectangle(HandleFill, HandleEdge, new Rect(
+                    centre.X - HandleSize / 2, centre.Y - HandleSize / 2, HandleSize, HandleSize));
+            }
         }
 
         // Round and accent-filled, so a control point does not read as a ninth
@@ -199,6 +207,11 @@ internal static class SelectionOverlay
         {
             if (Near(Position(canvas, annotation, kind), element)) return kind;
         }
+
+        // No box means no resizers and no rotate arm to grab — and they must not be
+        // grabbable while invisible, or a line has an eight-handle hit region drawn
+        // nowhere.
+        if (!annotation.HasBoundingBox) return HandleKind.None;
 
         if (Near(Position(canvas, annotation, HandleKind.Rotate), element)) return HandleKind.Rotate;
 

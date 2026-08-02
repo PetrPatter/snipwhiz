@@ -17,6 +17,10 @@ public enum HandleKind
     /// rotate handle; see <see cref="Annotation.ControlPoints"/>.
     /// </summary>
     Tail,
+
+    /// <summary>The two ends of a line or an arrow. See <see cref="Annotation.HasBoundingBox"/>.</summary>
+    Start,
+    End,
 }
 
 /// <summary>
@@ -260,9 +264,19 @@ public static class Handles
         return rotated;
     }
 
-    /// <summary>The handle across the object from this one; the anchor a resize pivots on.</summary>
+    /// <summary>
+    /// The handle across the object from this one; the anchor a resize pivots on.
+    ///
+    /// <para><see cref="HandleKind.Start"/> and <see cref="HandleKind.End"/> are
+    /// control points rather than resizers, but they are opposite each other in
+    /// exactly the sense this method means: drag one and the other stays put. That is
+    /// what tells the selection tool to re-anchor the object's frame afterwards.
+    /// <see cref="HandleKind.Tail"/> has no opposite, and so does not.</para>
+    /// </summary>
     public static HandleKind Opposite(HandleKind kind) => kind switch
     {
+        HandleKind.Start => HandleKind.End,
+        HandleKind.End => HandleKind.Start,
         HandleKind.TopLeft => HandleKind.BottomRight,
         HandleKind.Top => HandleKind.Bottom,
         HandleKind.TopRight => HandleKind.BottomLeft,
