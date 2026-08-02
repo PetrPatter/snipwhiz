@@ -311,7 +311,29 @@ public partial class App : Application
 
     private void OfferPrintScreenTakeover(Settings settings)
     {
-        if (settings.PrintScreenPromptAnswered) return;
+        // A hotkey registration belongs to the process that made it and dies with it,
+        // so a PrintScreen taken over once has to be taken over again on every launch.
+        // It was not, which made the claim last exactly one session — and the balloon
+        // that announces it asks the user to sign out and back in, so the one action
+        // the app recommends was the action that undid it.
+        //
+        // The registry value is the record of consent, not a setting of our own: this
+        // app only ever clears it by asking, and a user who turns Snipping Tool back
+        // on in Windows Settings has said what they want. Silently, because consent
+        // was given once — and because the failure balloon would otherwise fire on
+        // every boot for someone whose PrintScreen is held by another program.
+        if (settings.PrintScreenPromptAnswered)
+        {
+            var held = !PrintScreenTakeover.IsSnippingToolBound()
+                       && _hotkeys!.TryRegister(HotkeyId.PrintScreenRegion, 0, HotkeyService.VkPrintScreen);
+
+            if (held != settings.PrintScreenTakenOver)
+            {
+                settings.PrintScreenTakenOver = held;
+                settings.Save(_root);
+            }
+            return;
+        }
 
         if (!PrintScreenTakeover.IsSnippingToolBound())
         {
