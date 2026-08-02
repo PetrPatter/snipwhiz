@@ -552,9 +552,26 @@ public partial class LibraryWindow : Window
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Hands the grid the width a row actually gets.
+    ///
+    /// <para><b>The scroller's viewport, not the host's width.</b> The host is as wide
+    /// as the control; the viewport is what is left after the vertical scrollbar and
+    /// the padding, and it is around 25px narrower. Laying tiles out to the host's
+    /// width put the last column partly underneath the scrollbar, which is exactly the
+    /// gutter V3 set out to remove, wearing a different hat.</para>
+    ///
+    /// <para>The scroller does not exist until the template has been applied, hence
+    /// the fallbacks — the first call comes from <c>Loaded</c>, before layout has
+    /// given anything a width.</para>
+    /// </summary>
     private void ApplyColumns()
     {
-        var available = RowsHost.ActualWidth > 0 ? RowsHost.ActualWidth : ActualWidth - 56;
+        var available =
+            _scroller?.ViewportWidth > 0 ? _scroller.ViewportWidth :
+            RowsHost.ActualWidth > 0 ? RowsHost.ActualWidth :
+            ActualWidth - 56;
+
         _model.SetLayout(available);
     }
 
@@ -564,6 +581,13 @@ public partial class LibraryWindow : Window
     /// </summary>
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
+        // The scrollbar appearing takes its width out of the viewport, and the window
+        // never resized, so nothing else would tell the grid to give it back. Safe to
+        // re-enter layout from here: a narrower viewport can only mean the same or
+        // fewer columns, which can only mean the same or more rows, which can only
+        // mean the scrollbar is still needed. It settles rather than oscillating.
+        if (e.ViewportWidthChange != 0) ApplyColumns();
+
         if (e.ViewportHeight <= 0) return;
         var remaining = e.ExtentHeight - (e.VerticalOffset + e.ViewportHeight);
         if (remaining <= e.ViewportHeight) _model.LoadNextPage();
