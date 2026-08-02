@@ -24,10 +24,6 @@ namespace Snipwhiz.App.Library;
 /// </summary>
 public partial class LibraryWindow : Window
 {
-    // Must match CaptureTile's Width plus its right margin, or the column count
-    // is computed against a tile width that does not exist.
-    private const double TileStride = 252 + 16;
-
     private readonly CaptureStore _store;
     private readonly ThumbnailCache _thumbnails;
     private readonly LibraryViewModel _model;
@@ -65,7 +61,17 @@ public partial class LibraryWindow : Window
             _model.Search(SearchBox.Text);
             UpdateEmptyState();
         };
-        SearchBox.TextChanged += (_, _) => { _searchDebounce!.Stop(); _searchDebounce.Start(); };
+        SearchBox.TextChanged += (_, _) =>
+        {
+            _searchDebounce!.Stop();
+            _searchDebounce.Start();
+            SearchPlaceholder.Visibility =
+                SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        };
+
+        // A focus ring, so tabbing to the field shows something happened.
+        SearchBox.GotKeyboardFocus += (_, _) => SearchBorder.BorderBrush = (Brush)FindResource("Accent");
+        SearchBox.LostKeyboardFocus += (_, _) => SearchBorder.BorderBrush = System.Windows.Media.Brushes.Transparent;
 
         // One handler for every tile rather than plumbing a click event through
         // the templates: find the tile the click landed in and open it.
@@ -549,7 +555,7 @@ public partial class LibraryWindow : Window
     private void ApplyColumns()
     {
         var available = RowsHost.ActualWidth > 0 ? RowsHost.ActualWidth : ActualWidth - 56;
-        _model.SetColumns((int)Math.Floor((available + 16) / TileStride));
+        _model.SetLayout(available);
     }
 
     /// <summary>
@@ -654,9 +660,13 @@ public partial class LibraryWindow : Window
         UpdateEmptyState();
 
         var bytes = await Task.Run(_store.TotalBytes);
-        Footer.Text = count == 0
+
+        // The count belongs in the header beside the search field; the footer is
+        // now a status line, which is what Flash writes to.
+        Tally.Text = count == 0
             ? string.Empty
             : $"{count:N0} {(count == 1 ? "capture" : "captures")} · {Describe(bytes)}";
+        Footer.Text = string.Empty;
     }
 
     private static string Describe(long bytes) => bytes switch

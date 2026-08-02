@@ -88,22 +88,33 @@
                     Foreground="#1C1B1A" FontSize="13" FontWeight="SemiBold"
                     Cursor="Hand" Visibility="Collapsed"/>
 
+        <!--
+          The underline is a bottom border on the button, so it is exactly as wide
+          as the word. It used to be a separate Border of Width="46" pulled back
+          under the button with Margin="-46,0,0,0" - hand-measured to fit "Library",
+          and wrong the moment the text, the font or the size changed.
+        -->
         <StackPanel Grid.Column="0" Orientation="Horizontal">
-            <Button x:Name="LibraryTab" Content="Library"
-                    Background="Transparent" BorderThickness="0"
-                    Foreground="{StaticResource Ink}"
-                    FontSize="22" FontWeight="SemiBold"
-                    Padding="0,0,0,6" Cursor="Hand"/>
-            <Border x:Name="LibraryTabMark" Width="46" Height="2" Background="{StaticResource Accent}"
-                    VerticalAlignment="Bottom" Margin="-46,0,0,0"/>
+            <StackPanel>
+                <Button x:Name="LibraryTab" Content="Library"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="{StaticResource Ink}"
+                        FontSize="22" FontWeight="SemiBold"
+                        Padding="0,0,0,6" Cursor="Hand"/>
+                <Border x:Name="LibraryTabMark" Height="2" Background="{StaticResource Accent}"
+                        Width="{Binding ActualWidth, ElementName=LibraryTab}"/>
+            </StackPanel>
 
-            <Button x:Name="EditTab" Content="Edit"
-                    Background="Transparent" BorderThickness="0"
-                    Foreground="{StaticResource InkMuted}"
-                    FontSize="22" FontWeight="SemiBold"
-                    Padding="0,0,0,6" Margin="26,0,0,0" Cursor="Hand"/>
-            <Border x:Name="EditTabMark" Width="30" Height="2" Background="{StaticResource Accent}"
-                    VerticalAlignment="Bottom" Margin="-30,0,0,0" Visibility="Collapsed"/>
+            <StackPanel Margin="26,0,0,0">
+                <Button x:Name="EditTab" Content="Edit"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="{StaticResource InkMuted}"
+                        FontSize="22" FontWeight="SemiBold"
+                        Padding="0,0,0,6" Cursor="Hand"/>
+                <Border x:Name="EditTabMark" Height="2" Background="{StaticResource Accent}"
+                        Width="{Binding ActualWidth, ElementName=EditTab}"
+                        Visibility="Collapsed"/>
+            </StackPanel>
         </StackPanel>
         </Grid>
 
@@ -121,16 +132,49 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
+            <!-- The capture count, moved up out of the footer so the header carries
+                 the information and the footer can be a status line. -->
+            <TextBlock x:Name="Tally" Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource InkMuted}"
+                       FontSize="12.5"/>
+
+            <!--
+              A magnifier and a placeholder, because without them this was a plain
+              rounded rectangle that read as a broken control rather than a search
+              field. The placeholder is a TextBlock behind the TextBox rather than a
+              watermark: WPF has no built-in one, and this is three lines.
+            -->
             <Border Grid.Column="1"
+                    x:Name="SearchBorder"
                     Background="{StaticResource SurfaceRaised}"
-                    CornerRadius="8" Padding="12,7"
-                    Width="260" HorizontalAlignment="Right">
-                <TextBox x:Name="SearchBox"
-                         Background="Transparent" BorderThickness="0"
-                         Foreground="{StaticResource Ink}"
-                         CaretBrush="{StaticResource Accent}"
-                         FontSize="13"
-                         VerticalContentAlignment="Center"/>
+                    BorderBrush="Transparent" BorderThickness="1"
+                    CornerRadius="9" Padding="12,7"
+                    Width="300" HorizontalAlignment="Right">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Path Grid.Column="0" Margin="0,0,9,0"
+                          VerticalAlignment="Center"
+                          Stroke="#6E6960" StrokeThickness="1.6"
+                          Data="M 6.5,1.5 A 5,5 0 1 0 6.6,1.5 M 10.4,10.4 L 14,14"/>
+
+                    <TextBlock x:Name="SearchPlaceholder" Grid.Column="1"
+                               Text="Search captures"
+                               Foreground="#6E6960" FontSize="13"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False"/>
+
+                    <TextBox x:Name="SearchBox" Grid.Column="1"
+                             Background="Transparent" BorderThickness="0"
+                             Foreground="{StaticResource Ink}"
+                             CaretBrush="{StaticResource Accent}"
+                             FontSize="13"
+                             VerticalContentAlignment="Center"/>
+                </Grid>
             </Border>
         </Grid>
 

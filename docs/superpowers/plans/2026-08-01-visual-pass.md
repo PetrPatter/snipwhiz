@@ -61,10 +61,10 @@ defect.
 
 **Files:** delete `Library/PreviewView.xaml` and `.xaml.cs`; `LibraryWindow`.
 
-- [ ] **Step 1: Tile activation opens the editor.** `EditRequested` directly.
-- [ ] **Step 2: Delete `PreviewView` entirely** — the control, `PreviewHost`, the
+- [x] **Step 1: Tile activation opens the editor.** `EditRequested` directly.
+- [x] **Step 2: Delete `PreviewView` entirely** — the control, `PreviewHost`, the
   `_preview` field, and its arm of the Escape chain.
-- [ ] **Step 3: Escape now backs out one level, not two.**
+- [x] **Step 3: Escape now backs out one level, not two.**
 
 **Verification:** double-click a tile, land in the editor with the capture loaded.
 Escape from the editor returns to the library; Escape again hides the window.
@@ -76,14 +76,20 @@ Escape from the editor returns to the library; Escape again hides the window.
 
 **Files:** `LibraryWindow.xaml(.cs)`, `CaptureTile.xaml`, `LibraryViewModel`.
 
-- [ ] **Step 1: Tiles divide the width.** The column count is already computed and
+- [x] **Step 1: Tiles divide the width.** The column count is already computed and
   measured correct; tiles take `available / columns` instead of a fixed 252.
-- [ ] **Step 2: A light mat behind each thumbnail**, so a dark capture has an edge.
-- [ ] **Step 3: The search field reads as one** — magnifier, placeholder, focus ring.
+- [x] **Step 2: A light mat behind each thumbnail**, so a dark capture has an edge.
+  *Deviated: there is no mat.* It was built as specified, looked like what it was —
+  a grey block — and was rejected on sight. The problem is real, but filling the
+  empty space was the wrong answer to it; **removing** the empty space is the right
+  one. `UniformToFill` plus `ClipToBounds` means the picture *is* the area and its
+  own boundary is the tile's, and a hairline underneath separates two dark captures
+  side by side. The cost is honest: a very wide capture loses its sides.
+- [x] **Step 3: The search field reads as one** — magnifier, placeholder, focus ring.
   The capture count moves up beside it, out of the footer.
-- [ ] **Step 4: The tab underline sizes itself.** It is currently `Width="46"` with
+- [x] **Step 4: The tab underline sizes itself.** It is currently `Width="46"` with
   `Margin="-46,0,0,0"`, hand-measured to the word "Library".
-- [ ] **Step 5: The marquee.** Four corner brackets in the icon's four colours,
+- [x] **Step 5: The marquee.** Four corner brackets in the icon's four colours,
   scaling in from slightly oversized, on hover and on selection — spec §3.7. Four
   `Border` elements with two sides each, on a `Storyboard`. **This replaces the
   accent border**, which frees orange to mean "action" rather than doubling as
@@ -93,6 +99,17 @@ Escape from the editor returns to the library; Escape again hides the window.
 with no gutter. **Negative control:** restore the fixed width and confirm the
 assertion fails. The existing grid virtualization gate re-runs unchanged — row
 height is untouched, so it must still pass.
+
+**Done:** 11 assertions in `GridLayoutTests`, six of them observed failing against
+the old fixed 252 before the fix went in. Virtualization gate unchanged and passing.
+
+**A defect the tile actions surfaced:** hovering a tile and clicking Copy opened the
+editor instead. `Click` bubbles, but the grid listens on `PreviewMouseLeftButtonUp`,
+which *tunnels* and therefore fires first — `e.Handled` in the Click handler was
+already too late. Fixed by bailing out of `OnGridClick` when the original source
+sits inside a `Button`. The same wrong comment was already on `RemoveButton`, where
+it had never shown because `OnGridClick` returns early for a missing capture: a bad
+pattern copied from what looked like precedent.
 
 ---
 

@@ -10,8 +10,70 @@ namespace Snipwhiz.App.Library;
 /// a decoded thumbnail survives re-chunking and recycling.
 /// </summary>
 public sealed class LibraryViewModel(CaptureStore store, ThumbnailCache cache)
+    : System.ComponentModel.INotifyPropertyChanged
 {
     private const int PageSize = 200;
+
+    /// <summary>Narrowest a tile is allowed to get before a column is dropped.</summary>
+    public const double MinTileWidth = 252;
+
+    /// <summary>Must match <c>CaptureTile</c>'s right and bottom margin.</summary>
+    public const double Gap = 16;
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    private double _tileWidth = MinTileWidth;
+
+    /// <summary>
+    /// How wide each tile should draw itself, so a row consumes the full width.
+    ///
+    /// <para>The old fixed 252 is why the grid had a ragged right edge: it fitted
+    /// as many whole tiles as would go and left the remainder — up to a tile's
+    /// worth, changing with every resize — as dead space.</para>
+    /// </summary>
+    public double TileWidth
+    {
+        get => _tileWidth;
+        private set
+        {
+            // Sub-pixel churn on every resize tick would re-layout the whole grid
+            // for nothing.
+            if (Math.Abs(value - _tileWidth) < 0.5) return;
+            _tileWidth = value;
+            PropertyChanged?.Invoke(this, new(nameof(TileWidth)));
+        }
+    }
+
+    /// <summary>
+    /// Works out both the column count and the tile width from the space available.
+    ///
+    /// <para>One method rather than two because they are one decision: the width
+    /// only means anything relative to the count that produced it, and computing
+    /// them apart is how they end up disagreeing.</para>
+    /// </summary>
+    public void SetLayout(double available)
+    {
+        if (available <= 0) return;
+
+        var (columns, width) = Layout(available);
+        TileWidth = width;
+        SetColumns(columns);
+    }
+
+    /// <summary>
+    /// How many tiles fit across, and how wide each must draw itself for the row to
+    /// come out exactly <paramref name="available"/> wide.
+    ///
+    /// <para>Static and pure so the arithmetic can be asserted without a store, a
+    /// thumbnail cache or a window — the defect it exists to prevent is off-by-a-gap
+    /// arithmetic, which needs none of those to reproduce.</para>
+    /// </summary>
+    public static (int Columns, double Width) Layout(double available)
+    {
+        // The +Gap on both sides is the trailing gap the last tile does not need.
+        var columns = Math.Max(1, (int)Math.Floor((available + Gap) / (MinTileWidth + Gap)));
+        return (columns, (available - Gap * (columns - 1)) / columns);
+    }
 
     private readonly List<CaptureRecord> _records = [];
     private readonly Dictionary<Guid, CaptureTileViewModel> _tiles = [];

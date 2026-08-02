@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Snipwhiz.Core.Storage;
 
@@ -32,9 +33,39 @@ public partial class CaptureTile : System.Windows.Controls.UserControl
 
         // Shown on hover rather than always. A capture with no file has nothing to
         // copy, so it keeps the Remove button and gets neither of these.
-        MouseEnter += (_, _) => HoverActions.Visibility =
-            DataContext is CaptureTileViewModel { IsMissing: false } ? Visibility.Visible : Visibility.Collapsed;
-        MouseLeave += (_, _) => HoverActions.Visibility = Visibility.Collapsed;
+        MouseEnter += (_, _) =>
+        {
+            var live = DataContext is CaptureTileViewModel { IsMissing: false };
+            HoverActions.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+            if (live) ShowMarquee(true);
+        };
+        MouseLeave += (_, _) =>
+        {
+            HoverActions.Visibility = Visibility.Collapsed;
+            ShowMarquee(false);
+        };
+    }
+
+    /// <summary>
+    /// Fades and scales the marquee in, rather than snapping it on.
+    ///
+    /// <para>The scale is what makes it read as locking on instead of merely
+    /// appearing: it starts marginally larger than the frame and settles, which is
+    /// what a viewfinder does. Animated in code rather than as a XAML trigger
+    /// because tiles are recycled, and a Storyboard left running on a container
+    /// that gets rebound animates the wrong capture.</para>
+    /// </summary>
+    private void ShowMarquee(bool show)
+    {
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        Marquee.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(show ? 1 : 0, TimeSpan.FromMilliseconds(show ? 150 : 110)));
+
+        var target = show ? 1.0 : 1.06;
+        var glide = new DoubleAnimation(target, TimeSpan.FromMilliseconds(180)) { EasingFunction = ease };
+        MarqueeScale.BeginAnimation(ScaleTransform.ScaleXProperty, glide);
+        MarqueeScale.BeginAnimation(ScaleTransform.ScaleYProperty, glide);
     }
 
     /// <summary>
