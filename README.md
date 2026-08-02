@@ -53,7 +53,7 @@ out so you know where they are; deleting them is your call, not the program's.
 Needs the .NET 10 SDK.
 
 ```
-dotnet test                       # 327 tests
+dotnet test                       # 346 tests
 scripts\release.ps1               # publish + installer into Releases\
 scripts\verify-clean-install.ps1  # install it in Windows Sandbox and prove it runs
 ```
