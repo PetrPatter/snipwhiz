@@ -137,6 +137,8 @@ public partial class App : Application
             {
                 ShowFirstRun(settings);
             }
+
+            StartUpdateCheck();
         }
         catch (Exception ex)
         {
@@ -478,6 +480,39 @@ public partial class App : Application
             _tray!.ShowBalloon("Copied", $"{outcome.Record!.Width} x {outcome.Record.Height} copied to the clipboard.");
     }
 
+    private readonly Update.Updater _updater = new();
+
+    /// <summary>
+    /// Kicks off the once-per-launch update check, off the startup path entirely.
+    ///
+    /// <para><b>Nothing about the tray or the hotkey may wait on this.</b> Spec 1
+    /// spent real effort on capture being instant and an update check on the startup
+    /// path would spend it back — so this is queued at
+    /// <see cref="DispatcherPriority.ApplicationIdle"/>, which cannot run until
+    /// everything above has, and then goes to a background thread anyway. The check
+    /// itself never throws; see <see cref="Update.Updater"/>.</para>
+    /// </summary>
+    private void StartUpdateCheck()
+    {
+        _updater.Ready += () => _tray?.ShowUpdateReady();
+
+        _tray!.RestartForUpdateRequested += () =>
+        {
+            _restartAfterUpdate = true;
+            Shutdown();
+        };
+
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
+            new Action(() => _ = _updater.CheckAsync()));
+    }
+
+    /// <summary>
+    /// Whether the user asked to restart, rather than simply closing the app. An
+    /// ordinary exit applies the update and stays exited: relaunching a tray app
+    /// somebody has just quit is not an update, it is an argument.
+    /// </summary>
+    private bool _restartAfterUpdate;
+
     protected override void OnExit(ExitEventArgs e)
     {
         // OnClosing refuses every close so the window survives being dismissed.
@@ -492,6 +527,12 @@ public partial class App : Application
         _tray?.Dispose();
         _store?.Dispose();
         _instanceLock?.Dispose();
+
+        // Last, and after the single-instance lock is released. Velopack's updater
+        // waits for this process to end before it touches the install directory, and
+        // the new version will want that mutex the moment it starts.
+        _updater.Apply(restart: _restartAfterUpdate);
+
         base.OnExit(e);
     }
 }

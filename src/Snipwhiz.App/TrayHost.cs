@@ -27,6 +27,7 @@ public sealed class TrayHost : IDisposable
 
     private readonly NotifyIcon _icon;
     private readonly ToolStripMenuItem _autostart;
+    private readonly ToolStripMenuItem _restartForUpdate;
     private readonly Settings _settings;
     private readonly string _root;
 
@@ -41,9 +42,25 @@ public sealed class TrayHost : IDisposable
         set => _autostart.Checked = value;
     }
 
+    /// <summary>
+    /// Reveals the restart affordance. Idempotent, and safe from any thread — the
+    /// update check runs off the UI thread and this is what it calls into.
+    /// </summary>
+    public void ShowUpdateReady()
+    {
+        if (_icon.ContextMenuStrip is { } menu && menu.InvokeRequired)
+        {
+            menu.BeginInvoke(ShowUpdateReady);
+            return;
+        }
+
+        _restartForUpdate.Visible = true;
+    }
+
     public event Action? RegionRequested;
     public event Action? FullscreenRequested;
     public event Action? LibraryRequested;
+    public event Action? RestartForUpdateRequested;
     public event Action? CancelRequested;   // inert until Task 8 wires it to the overlay
     public event Action? ExitRequested;
 
@@ -58,6 +75,16 @@ public sealed class TrayHost : IDisposable
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Library\tCtrl+Shift+L", null, (_, _) => LibraryRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
+
+        // The entire update interface. Hidden until there is something to restart
+        // for, so on an up-to-date machine this menu looks exactly as it always has.
+        // No changelog, no "what's new", no badge, no nagging: spec section 4.3.
+        _restartForUpdate = new ToolStripMenuItem("Restart to finish updating")
+        {
+            Visible = false,
+        };
+        _restartForUpdate.Click += (_, _) => RestartForUpdateRequested?.Invoke();
+        menu.Items.Add(_restartForUpdate);
         menu.Items.Add("Cancel capture", null, (_, _) => CancelRequested?.Invoke());
         menu.Items.Add(new ToolStripSeparator());
 
