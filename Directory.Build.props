@@ -12,7 +12,7 @@
     assembly it is compiled into. Neither restates the number.
   -->
   <PropertyGroup>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
 </Project>
