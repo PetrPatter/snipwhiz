@@ -82,8 +82,21 @@ public sealed class TrayHost : IDisposable
             ContextMenuStrip = menu,
         };
         // Opens the library, not a capture: a hotkey is the natural way to capture,
-        // and a double-click is the natural way to open a window.
-        _icon.DoubleClick += (_, _) => LibraryRequested?.Invoke();
+        // and a click is the natural way to open a window.
+        //
+        // A *single* click, and that is the whole point. This was DoubleClick, which
+        // works on the taskbar's own tray but not from the hidden-icons flyout — the
+        // flyout closes on the first click, so the second one lands on whatever is
+        // underneath it and the icon never sees a double-click at all. For an app
+        // whose icon lives in the overflow by default, that meant clicking it
+        // appeared to do nothing.
+        //
+        // ShowLibrary reveals an existing window rather than making a second one, so
+        // a double-click firing this twice is harmless.
+        _icon.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left) LibraryRequested?.Invoke();
+        };
     }
 
     /// <summary>
@@ -117,11 +130,29 @@ public sealed class TrayHost : IDisposable
         }
     }
 
+    /// <summary>
+    /// Says something in a notification.
+    /// </summary>
+    ///
+    /// <remarks>
+    /// <para><b>Ordinary notifications carry no glyph.</b> <c>ToolTipIcon.Info</c> put
+    /// a large generic blue "i" in the toast — Windows' icon, announcing Windows,
+    /// where this app's own identity should be. <c>None</c> leaves the header's app
+    /// icon as the only mark on it, which is the right one.</para>
+    ///
+    /// <para>A custom image in that slot is not reachable from here: it needs the
+    /// <c>NIIF_USER</c> flag on <c>NOTIFYICONDATA</c>, which <see cref="NotifyIcon"/>
+    /// does not expose and cannot be set behind its back without owning the tray icon
+    /// at the Win32 level.</para>
+    ///
+    /// <para>Errors keep their glyph. The red cross is not standing in for a logo —
+    /// it is the one piece of information a notification can carry before it is read.</para>
+    /// </remarks>
     public void ShowBalloon(string title, string text, bool isError = false)
     {
         _icon.BalloonTipTitle = title;
         _icon.BalloonTipText = text;
-        _icon.BalloonTipIcon = isError ? ToolTipIcon.Error : ToolTipIcon.Info;
+        _icon.BalloonTipIcon = isError ? ToolTipIcon.Error : ToolTipIcon.None;
         _icon.ShowBalloonTip(5000);
     }
 
