@@ -117,19 +117,52 @@ pattern copied from what looked like precedent.
 
 **Files:** `Editor/EditorView.xaml`, `Editor/CanvasHost.cs`, `Editor/StylePill`.
 
-- [ ] **Step 1: The capture sits on a mat.** Checkered ground, soft shadow, hairline
+- [x] **Step 1: The capture sits on a mat.** Checkered ground, soft shadow, hairline
   border — so the image has a boundary and the crop tool has something to aim at.
-- [ ] **Step 2: The rail hugs its tools**, grouped by family with separators,
+  *Deviated: no checker.* The checker means alpha everywhere it is used and a
+  screenshot is opaque, so it would say something untrue about the pixels. Shadow and
+  hairline only.
+- [x] **Step 2: The rail hugs its tools**, grouped by family with separators,
   instead of stretching the window height.
-- [ ] **Step 3: The style pill gets a legible ground.** Solid translucent, not
+- [x] **Step 3: The style pill gets a legible ground.** Solid translucent, not
   frosted — WPF has no per-element backdrop blur and chasing one is wasted time.
-- [ ] **Step 4: The marquee on a selected annotation**, matching the library tile,
+  *The ground was already 95% opaque and fine.* What made the pill look imported from
+  another program was the stock WPF `Slider`, whose track halves template as raised
+  Aero chrome buttons. That is what got restyled.
+- [x] **Step 4: The marquee on a selected annotation**, matching the library tile,
   and reconciled with what the crop tool already draws. Three surfaces currently
   draw a version of this shape and look unrelated; after this they are one motif.
+  *Deviated: regions get the marquee, objects do not.* The mark means "an area is
+  chosen" — true of a crop and of a library tile, false of a rectangle you drew. An
+  annotation already says what it is with eight handles and a rotate arm, and
+  brackets over those would be two selection languages on one shape.
 
 **Verification:** open a capture that is almost entirely black and confirm its edges
 are visible. **Negative control:** a deliberately white capture, since a mat tuned
 only against dark ones is a mat tuned to half the problem.
+
+**The negative control did its job, and the diagnosis was not the obvious one.** The
+white capture showed no edge and no shadow. The reason was not that the hairline is
+too faint on white — it was that **the shadow had never worked at all.** Black at 55%
+over the window's near-black ground is not a shadow, and the dark capture only looked
+correct because the hairline was carrying the entire effect on its own.
+
+So the fix is a ground the shadow can darken: the editor canvas is now *lighter* than
+the chrome around it, which is what every image editor does and what this one was not
+doing. A white capture casts a visible shadow onto it; a black capture contrasts with
+it and keeps the hairline.
+
+**Two further defects surfaced by eye during the same pass**, neither of them in this
+task's scope and both real:
+
+- **The crop rectangle had corners but no edges.** Four brackets say where the corners
+  are and leave the edges between them to be inferred, which on a large crop is a long
+  way to infer. A faint continuous edge now joins them, dimmer than the brackets.
+- **Zoom existed and was undiscoverable.** `Ctrl`+wheel, `Ctrl+0` and `Ctrl+1` all
+  worked; the percentage in the status line was a readout for controls that did not
+  exist anywhere. It is now a control — step out, step in, Fit, 1:1 — and `Ctrl+plus`
+  / `Ctrl+minus`, which genuinely were missing, are bound on both the number row and
+  the numpad.
 
 ---
 

@@ -44,13 +44,19 @@ public sealed class CanvasHost : FrameworkElement
     /// and a screenshot is opaque; borrowing the convention here would say something
     /// untrue about the pixels. A shadow says the right thing instead: the picture is
     /// an object lying on a surface.</para>
+    ///
+    /// <para><b>The shadow only works because the ground was lifted to meet it.</b>
+    /// Against the window's near-black this was black on black and did nothing, which
+    /// is why a white capture appeared to have no treatment at all — it was the
+    /// hairline carrying the whole effect, and the hairline is invisible next to
+    /// white. See <c>CanvasGround</c> in EditorView.xaml.</para>
     /// </summary>
     private readonly ShadowedVisual _mat = new(new System.Windows.Media.Effects.DropShadowEffect
     {
-        BlurRadius = 26,
-        ShadowDepth = 7,
+        BlurRadius = 22,
+        ShadowDepth = 6,
         Direction = 270,
-        Opacity = 0.55,
+        Opacity = 0.7,
         Color = Colors.Black,
     });
 
@@ -370,6 +376,16 @@ public sealed class CanvasHost : FrameworkElement
     }
 
     public void ActualSize() => SetZoomCentred(1);
+
+    /// <summary>
+    /// Zooms one step about the middle of the viewport.
+    ///
+    /// <para>For the keyboard and the zoom buttons, which have no pointer to zoom
+    /// around. Multiplicative like the wheel, so a step feels the same at 10% as at
+    /// 800%.</para>
+    /// </summary>
+    public void ZoomStep(double factor) =>
+        ZoomAt(_zoom * factor, new Point(ActualWidth / 2, ActualHeight / 2));
 
     /// <summary>
     /// Re-fits if the document's crop changed underneath the view.

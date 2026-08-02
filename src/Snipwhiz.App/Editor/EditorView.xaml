@@ -11,6 +11,20 @@
         <SolidColorBrush x:Key="Accent" Color="#E8833A"/>
 
         <!--
+          The ground the capture lies on, and the one surface in the app that is
+          lighter than the chrome around it.
+
+          It used to be Surface, the same near-black as the window. That made the
+          shadow under the picture black on near-black, so it could not register at
+          all - and a white capture therefore had no shadow, no visible hairline, and
+          nothing but its own brightness to say where it ended. Lifting the ground
+          gives the shadow something to darken, and gives a dark capture something to
+          contrast with. It is also what every image editor does: dark panels, lighter
+          artboard.
+        -->
+        <SolidColorBrush x:Key="CanvasGround" Color="#2B2825"/>
+
+        <!--
           The two halves of the slider track. Templated to bare Borders because a
           RepeatButton's default template is a raised Aero chrome button, and two of
           them are what made the stroke-width control look like it had been dropped
@@ -91,6 +105,29 @@
             <Setter Property="Height" Value="1"/>
             <Setter Property="Background" Value="#24F5F2EC"/>
             <Setter Property="Margin" Value="6,5,6,7"/>
+        </Style>
+
+        <!-- Quiet until pointed at: the status line is the least important row here. -->
+        <Style x:Key="ZoomButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource InkMuted}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chip" CornerRadius="5" Background="Transparent"
+                                Padding="7,3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="#332B2823"/>
+                                <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Icon-only rail button. Active tool fills with the accent. -->
@@ -224,7 +261,7 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0">
-                <Border Background="{StaticResource Surface}" CornerRadius="14" ClipToBounds="True">
+                <Border Background="{StaticResource CanvasGround}" CornerRadius="14" ClipToBounds="True">
                     <editor:CanvasHost x:Name="Canvas"/>
                 </Border>
 
@@ -267,13 +304,46 @@
                 </Canvas>
             </Grid>
 
-            <Grid Grid.Row="1" Margin="6,10,6,0">
+            <Grid Grid.Row="1" Margin="6,8,6,0">
                 <TextBlock x:Name="StatusText"
                            Foreground="{StaticResource InkMuted}" FontSize="11"
                            HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                <TextBlock x:Name="ZoomText"
-                           Foreground="{StaticResource InkMuted}" FontSize="11"
-                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+
+                <!--
+                  Zoom was already here - Ctrl+wheel, Ctrl+0, Ctrl+1 - and there was no
+                  way to find that out. A percentage you cannot click reads as a
+                  readout for a control that exists somewhere else.
+                -->
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button x:Name="ZoomOutButton" Content="&#xE738;"
+                            FontFamily="Segoe MDL2 Assets" FontSize="10"
+                            Style="{StaticResource ZoomButton}"
+                            ToolTip="Zoom out  (Ctrl+-)"/>
+
+                    <!-- Fixed width so stepping through 100% to 75% does not shuffle
+                         the buttons either side of it. -->
+                    <TextBlock x:Name="ZoomText" Width="42" TextAlignment="Center"
+                               Foreground="{StaticResource InkMuted}" FontSize="11"
+                               VerticalAlignment="Center"/>
+
+                    <Button x:Name="ZoomInButton" Content="&#xE710;"
+                            FontFamily="Segoe MDL2 Assets" FontSize="10"
+                            Style="{StaticResource ZoomButton}"
+                            ToolTip="Zoom in  (Ctrl++)"/>
+
+                    <Border Width="1" Background="#24F5F2EC" Margin="6,3,6,3"/>
+
+                    <Button x:Name="ZoomFitButton" Content="Fit"
+                            Style="{StaticResource ZoomButton}"
+                            ToolTip="Fit to window  (Ctrl+0)"/>
+
+                    <!-- "1:1" rather than "100%", which would be a button labelled the
+                         same as the readout two inches to its left. -->
+                    <Button x:Name="ZoomActualButton" Content="1:1"
+                            Style="{StaticResource ZoomButton}"
+                            ToolTip="Actual size  (Ctrl+1)"/>
+                </StackPanel>
             </Grid>
         </Grid>
     </Grid>

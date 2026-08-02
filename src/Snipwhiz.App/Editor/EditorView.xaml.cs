@@ -66,6 +66,14 @@ public partial class EditorView : UserControl
         PixelateToolButton.Click += (_, _) => UseShape(PixelateToolButton, () => new PixelateAnnotation());
         CropToolButton.Click += (_, _) => UseCrop();
 
+        // Same four operations the keyboard already had. RefreshStatus is not called
+        // here: every one of these ends in ApplyView, which raises ViewChanged, which
+        // is already wired to it below.
+        ZoomOutButton.Click += (_, _) => Canvas.ZoomStep(1 / 1.25);
+        ZoomInButton.Click += (_, _) => Canvas.ZoomStep(1.25);
+        ZoomFitButton.Click += (_, _) => Canvas.Fit();
+        ZoomActualButton.Click += (_, _) => Canvas.ActualSize();
+
         Canvas.SelectionChanged += RefreshStatus;
         Canvas.ViewChanged += RefreshStatus;   // panning moves the pill too
         Canvas.MouseLeftButtonDown += OnCanvasPress;
@@ -592,6 +600,13 @@ public partial class EditorView : UserControl
 
             case Key.D0 when control: Canvas.Fit(); break;
             case Key.D1 when control: Canvas.ActualSize(); break;
+
+            // Both rows of the keyboard. Key.OemPlus is the one beside Backspace and
+            // Key.Add is the numpad's, and they are separate keys — binding only the
+            // first is how a shortcut works everywhere except on the pad you were
+            // reaching for.
+            case Key.OemPlus or Key.Add when control: Canvas.ZoomStep(1.25); break;
+            case Key.OemMinus or Key.Subtract when control: Canvas.ZoomStep(1 / 1.25); break;
 
             case Key.OemOpenBrackets: Reorder(-1); break;
             case Key.OemCloseBrackets: Reorder(+1); break;

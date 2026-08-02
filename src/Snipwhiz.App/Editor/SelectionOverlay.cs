@@ -47,8 +47,17 @@ internal static class SelectionOverlay
         Frozen(new Pen(Frozen(Color.FromRgb(0x1F, 0xE0, 0xB4)), 2.5)),
     ];
 
+    /// <summary>
+    /// The crop rectangle's own edge, joining the four corner brackets.
+    ///
+    /// <para>Deliberately dimmer than the brackets and than the old accent outline it
+    /// replaces: it is there to close the shape, not to compete with the corners for
+    /// which part of this you are meant to look at.</para>
+    /// </summary>
+    private static readonly Pen CropEdge = Frozen(new Pen(Frozen(Color.FromArgb(0x66, 0xF5, 0xF2, 0xEC)), 1));
+
     /// <summary>How far a marquee bracket runs along each edge, on screen.</summary>
-    private const double CornerArm = 18;
+    private const double CornerArm = 22;
 
     private static readonly Brush ControlFill = Frozen(Color.FromRgb(0xE8, 0x83, 0x3A));
 
@@ -92,6 +101,12 @@ internal static class SelectionOverlay
         mask.Children.Add(new RectangleGeometry(inner));
         mask.Freeze();
         dc.DrawGeometry(CropDim, null, mask);
+
+        // The full rectangle, faintly, under the corners. The corners alone say where
+        // the crop's four corners are and leave you to infer the edges between them —
+        // which on a large crop is a long way to infer. The brackets are the accent;
+        // this is the shape.
+        dc.DrawRectangle(null, CropEdge, inner);
 
         DrawMarquee(dc, inner);
 
