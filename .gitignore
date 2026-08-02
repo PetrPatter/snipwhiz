@@ -39,6 +39,10 @@ EBWebView/
 # Subagent-driven-development scratch (ledger, briefs, review packages)
 .superpowers/
 
+# Local issue tracker. This repo is public and issue drafts are not; specs and
+# plans live in docs/superpowers/ and are tracked. See docs/agents/issue-tracker.md.
+.scratch/
+
 # OS
 Thumbs.db
 ehthumbs.db
