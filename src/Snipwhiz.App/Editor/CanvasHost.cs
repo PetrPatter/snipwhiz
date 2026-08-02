@@ -33,6 +33,28 @@ public sealed class CanvasHost : FrameworkElement
     private readonly Dictionary<Annotation, DrawingVisual> _visuals = [];
 
     /// <summary>
+    /// The ground the picture sits on: a hairline round its edge and a shadow under
+    /// it, drawn <b>below</b> the scene and outside the crop clip.
+    ///
+    /// <para>A near-black capture on a near-black canvas had no visible boundary, so
+    /// there was nothing to tell you where the picture stopped and the editor began —
+    /// and nothing for the crop tool to aim at.</para>
+    ///
+    /// <para><b>Not a checkerboard.</b> The checker means alpha everywhere it is used,
+    /// and a screenshot is opaque; borrowing the convention here would say something
+    /// untrue about the pixels. A shadow says the right thing instead: the picture is
+    /// an object lying on a surface.</para>
+    /// </summary>
+    private readonly ShadowedVisual _mat = new(new System.Windows.Media.Effects.DropShadowEffect
+    {
+        BlurRadius = 26,
+        ShadowDepth = 7,
+        Direction = 270,
+        Opacity = 0.55,
+        Color = Colors.Black,
+    });
+
+    /// <summary>
     /// Handles and marquee, deliberately <b>outside</b> the view transform.
     ///
     /// <para>Drawn in element coordinates so a grab handle is the same size under
@@ -58,9 +80,22 @@ public sealed class CanvasHost : FrameworkElement
     /// </summary>
     private readonly ContainerVisual _scene = new();
 
+    /// <summary>
+    /// A <see cref="DrawingVisual"/> that can carry an effect. <c>VisualEffect</c> is
+    /// protected, so there is no way to set one on a plain drawing visual from
+    /// outside it.
+    /// </summary>
+    private sealed class ShadowedVisual(System.Windows.Media.Effects.Effect effect) : DrawingVisual
+    {
+        public void Apply() => VisualEffect = effect;
+    }
+
     public CanvasHost()
     {
+        _mat.Apply();
+
         AddVisualChild(_layers);
+        _layers.Children.Add(_mat);
         _layers.Children.Add(_scene);
         _layers.Children.Add(_overlay);
         _scene.Children.Add(_root);
@@ -166,6 +201,11 @@ public sealed class CanvasHost : FrameworkElement
         }
 
         Rebuild();
+
+        // The clip and the mat are both sized from the document, and Fit() does not
+        // run until the next layout pass — without this the new capture spends a
+        // frame wearing the previous one's boundary.
+        ApplyView();
     }
 
     /// <summary>
@@ -376,13 +416,44 @@ public sealed class CanvasHost : FrameworkElement
         // flattener needs no equivalent — the clip there is the bitmap's own edge.
         var content = ContentSize;
         _viewedContent = content;
-        var clip = new RectangleGeometry(new Rect(
-            _pan.X, _pan.Y, content.Width * _zoom, content.Height * _zoom));
+        var picture = new Rect(_pan.X, _pan.Y, content.Width * _zoom, content.Height * _zoom);
+        var clip = new RectangleGeometry(picture);
         clip.Freeze();
         _scene.Clip = clip;
+
+        DrawMat(picture);
         // Handles are positioned from image space, so they move when the view does.
         RefreshOverlay();
         ViewChanged?.Invoke();
+    }
+
+    private static readonly Brush MatFill = Freeze(new SolidColorBrush(Color.FromRgb(0x14, 0x13, 0x12)));
+
+    private static readonly Pen MatEdge =
+        Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(0x3D, 0xFF, 0xFF, 0xFF))), 1));
+
+    private static T Freeze<T>(T freezable) where T : Freezable
+    {
+        freezable.Freeze();
+        return freezable;
+    }
+
+    /// <summary>
+    /// Draws the picture's ground: a fill the shadow can be cast from, and a hairline
+    /// round the outside of it.
+    ///
+    /// <para>The hairline is on a rect inflated by half its own thickness, so the
+    /// whole stroke lands <i>outside</i> the picture. Drawn on the boundary it would
+    /// be half-covered by the image and read as a half-strength line — visible only
+    /// on the two edges where the image happens to be dark.</para>
+    /// </summary>
+    private void DrawMat(Rect picture)
+    {
+        using var dc = _mat.RenderOpen();
+        if (picture.Width <= 0 || picture.Height <= 0) return;
+
+        dc.DrawRectangle(MatFill, null, picture);
+        dc.DrawRectangle(null, MatEdge, Rect.Inflate(picture, 0.5, 0.5));
     }
 
     // ---- navigation input -------------------------------------------------

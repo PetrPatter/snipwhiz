@@ -35,6 +35,21 @@ internal static class SelectionOverlay
 
     private static readonly Brush CropDim = Frozen(Color.FromArgb(0xA8, 0x0E, 0x0D, 0x0C));
 
+    /// <summary>
+    /// The marquee: the four corner colours of the app's icon, clockwise from the
+    /// top left. The same four the library tile uses.
+    /// </summary>
+    private static readonly Pen[] MarqueeCorners =
+    [
+        Frozen(new Pen(Frozen(Color.FromRgb(0xFF, 0xA1, 0x2E)), 2.5)),
+        Frozen(new Pen(Frozen(Color.FromRgb(0xFF, 0x3D, 0x6E)), 2.5)),
+        Frozen(new Pen(Frozen(Color.FromRgb(0xA4, 0x6B, 0xFF)), 2.5)),
+        Frozen(new Pen(Frozen(Color.FromRgb(0x1F, 0xE0, 0xB4)), 2.5)),
+    ];
+
+    /// <summary>How far a marquee bracket runs along each edge, on screen.</summary>
+    private const double CornerArm = 18;
+
     private static readonly Brush ControlFill = Frozen(Color.FromRgb(0xE8, 0x83, 0x3A));
 
     public static void Render(
@@ -73,7 +88,7 @@ internal static class SelectionOverlay
         mask.Freeze();
         dc.DrawGeometry(CropDim, null, mask);
 
-        dc.DrawRectangle(null, Outline, inner);
+        DrawMarquee(dc, inner);
 
         // The same handle geometry the selection uses, positioned from the same
         // Handles table — a crop rectangle is an unrotated box and there is no second
@@ -84,6 +99,44 @@ internal static class SelectionOverlay
             var centre = canvas.ToElement(Handles.ImagePosition(proxy, kind, 0));
             dc.DrawRectangle(HandleFill, HandleEdge, new Rect(
                 centre.X - HandleSize / 2, centre.Y - HandleSize / 2, HandleSize, HandleSize));
+        }
+    }
+
+    /// <summary>
+    /// Four corner brackets in the icon's colours — the same mark the library tile
+    /// wears, and the same one the capture overlay draws round a region.
+    ///
+    /// <para><b>Regions get the marquee; objects do not.</b> The plan asked for this
+    /// on a selected annotation too, and that is wrong: the marquee means <i>an area
+    /// is chosen</i>, which is true of a crop and of a tile and is not true of a
+    /// rectangle you drew. An object already says what it is by having eight resize
+    /// handles and a rotate arm, and putting brackets over those would be two
+    /// selection languages on one shape. So an annotation keeps its accent outline,
+    /// and orange still means "the thing you are acting on".</para>
+    ///
+    /// <para>Brackets are clamped to half the rectangle so a crop dragged down to a
+    /// few pixels shows four short corners rather than four overlapping ones.</para>
+    /// </summary>
+    private static void DrawMarquee(DrawingContext dc, Rect box)
+    {
+        var arm = Math.Min(CornerArm, Math.Min(box.Width, box.Height) / 2);
+        if (arm <= 0) return;
+
+        // Clockwise from the top left, matching the pen order.
+        var corners = new[]
+        {
+            (Point: box.TopLeft,     X: 1.0,  Y: 1.0),
+            (Point: box.TopRight,    X: -1.0, Y: 1.0),
+            (Point: box.BottomRight, X: -1.0, Y: -1.0),
+            (Point: box.BottomLeft,  X: 1.0,  Y: -1.0),
+        };
+
+        for (var i = 0; i < corners.Length; i++)
+        {
+            var (point, dx, dy) = corners[i];
+            var pen = MarqueeCorners[i];
+            dc.DrawLine(pen, point, new Point(point.X + arm * dx, point.Y));
+            dc.DrawLine(pen, point, new Point(point.X, point.Y + arm * dy));
         }
     }
 

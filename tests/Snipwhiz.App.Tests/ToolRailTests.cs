@@ -112,6 +112,45 @@ public class ToolRailTests
         });
     }
 
+    /// <summary>
+    /// The rail is taller than a short window, and the tools past the fold have to
+    /// remain reachable.
+    ///
+    /// <para>Before the rail sized to its content it stretched to the window and
+    /// simply <b>clipped</b>: at the window's own <c>MinHeight</c> of 420, Crop and
+    /// Pixelate were drawn past the bottom edge with no way to scroll to them. They
+    /// still had shortcuts, so nothing failed — the buttons just were not there.</para>
+    ///
+    /// <para>The first two assertions are the control. If Crop were already on screen
+    /// unscrolled, the third would pass without the scroller doing anything.</para>
+    /// </summary>
+    [Fact]
+    public void Tools_past_the_bottom_of_a_short_window_can_still_be_scrolled_to()
+    {
+        Harness.Editor(editor =>
+        {
+            // The harness window is 300 tall and the rail wants roughly twice that.
+            var scroller = editor.ToolRailScroller;
+            Assert.True(scroller.ScrollableHeight > 0,
+                $"the rail fits in {scroller.ViewportHeight:F0}px, so this proves nothing");
+
+            Assert.True(BottomOf(editor.CropToolButton, scroller) > scroller.ViewportHeight,
+                "Crop was already visible unscrolled, so the scroll below is not what makes it reachable");
+
+            scroller.ScrollToEnd();
+            editor.UpdateLayout();
+
+            Assert.True(BottomOf(editor.CropToolButton, scroller) <= scroller.ViewportHeight + 1,
+                "the last tool on the rail cannot be reached by scrolling");
+        });
+    }
+
+    /// <summary>How far down the scroller's viewport an element's bottom edge sits.</summary>
+    private static double BottomOf(System.Windows.FrameworkElement element, System.Windows.FrameworkElement scroller) =>
+        element.TransformToAncestor(scroller)
+            .TransformBounds(new System.Windows.Rect(element.RenderSize))
+            .Bottom;
+
     // NOT COVERED: HandleKey returning false while a caption is being typed, so
     // that "T" is a letter and not the text tool. Reaching that state needs a real
     // drag on the canvas to create the object, which is a mouse-gesture harness
