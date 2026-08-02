@@ -217,6 +217,18 @@ reported: pressing a tile, dragging away and releasing used to open whatever was
 the release. **Verified by hand only** — pinning it would mean standing up a store, a
 thumbnail cache and two view models to assert one reference comparison.
 
+**And a second, found in a screenshot taken for the README.** The minimise button wore
+a light grey block and *lost* it on hover. `CaptionButton`'s template binds
+`{TemplateBinding Background}` but the style never set one, so the button inherited
+WPF's stock `Button` brush — an Aero gradient — and painted it into a near-black
+caption; hover then replaced it with the faint white overlay, which reads backwards.
+Maximise escaped only because it sets `Background="Transparent"` inline and close
+because `CaptionClose` hardcodes it on its own Border, so one of three was wrong and
+the two that were right were right by accident. Fixed with the setter the style was
+missing. **It survived the whole by-hand chrome pass** — drag, maximise, snap and the
+system menu were all checked, and nobody looked at the button that was not being
+tested.
+
 ---
 
 ## Verification summary
