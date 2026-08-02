@@ -3,6 +3,9 @@
 A screenshot tool for Windows 11. Press a key, drag a box, it's on your clipboard —
 and it's still there tomorrow when you want to find it again.
 
+![The Snipwhiz editor: a capture with an arrow, a highlight, a callout and two
+blurred regions over it](assets/screenshot-editor.png)
+
 ## Install
 
 Download **Snipwhiz-Setup.exe** from the [latest release](../../releases/latest) and

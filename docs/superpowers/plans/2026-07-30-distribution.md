@@ -235,11 +235,16 @@ absolute paths containing the user's name, before the push and not after.
 
 **Verification:** install 1.0.0, publish 1.0.1, launch, confirm it updates and
 restarts into the new version — **with captures taken under 1.0.0 still present and
-openable**. **Negative controls, three:** point the app at an unreachable feed and
-confirm it works exactly as before with no dialog; publish a deliberately broken
-1.0.2 and confirm the previous version is still on disk and runnable; and confirm
-an update does not touch the library by watching the data directory across the
+openable**. **Negative controls, three:** run with networking disabled and confirm
+it works exactly as before with no dialog; publish a 1.0.2 whose payload is
+corrupt and confirm the app **is still running 1.0.1** afterwards; and confirm an
+update does not touch the library by watching the data directory across the
 version bump.
+
+**The second control proves a failed update, not a rollback**, and the two are
+different claims — see `CONTEXT.md`. A failed update leaves you on the version you
+already had, which is what a corrupt payload produces. Nothing here returns the app
+to an older version after a newer one has installed.
 
 ---
 
@@ -285,5 +290,10 @@ gaps rather than in a gate that quietly never ran.
 - **No crash reporting.** When somebody says "it stopped working" there will be
   nothing to look at. Deliberate — it is a consent conversation, not a feature —
   but it is the obvious next gap once other people are running this.
+- **A release that installs and then crashes has no automatic recovery.** The
+  corrupt-payload control covers the update that never applies. It does not cover
+  the well-formed package that applies cleanly and then dies on launch — Velopack
+  will not go back on its own, and the fix is a person running an installer by hand.
+  The gate that passes says less than its name suggests.
 - **No downgrade path for the library format.** Newer reads older; the reverse is
   untested, so rolling back across a schema change is unmapped territory.

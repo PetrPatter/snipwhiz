@@ -18,7 +18,8 @@ suggest creating them up front. The `/domain-modeling` skill (reached via
 `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily,
 when terms or decisions actually get resolved.
 
-Neither exists today.
+Both exist. `CONTEXT.md` holds two terms so far and `docs/adr/` holds one decision
+— they are grown when something is actually argued about, not filled in up front.
 
 ## File structure
 
