@@ -117,10 +117,12 @@ public partial class EditorView : UserControl
         _record = record;
         _source = source;
 
+#if DEBUG
         // The memory gate's negative control: keeps every source the editor is ever
         // given, modelling something in the app retaining them.
         if (Diagnostics.EditorMemoryVerification.BreakRelease)
             Diagnostics.EditorMemoryVerification.Retain(source);
+#endif
         _document = LoadProject(record);
         _undo = new UndoStack(_document);
 

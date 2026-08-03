@@ -65,9 +65,11 @@ public partial class App : Application
             _store = new CaptureStore(_root);
             _pipeline = new CapturePipeline(_store);
 
+#if DEBUG
             // Inert unless SNIPWHIZ_SEED is set, and refuses to run against the
             // real library. See Diagnostics.LibrarySeed.
             Diagnostics.LibrarySeed.RunIfRequested(_store);
+#endif
 
             _tray = new TrayHost(settings, _root);
             _tray.FullscreenRequested += CaptureFullscreen;
@@ -85,6 +87,10 @@ public partial class App : Application
             };
 
             RegisterHotkeys();
+
+#if DEBUG
+            // The verification gates, every one of them env-gated and none of them
+            // compiled into a Release build — see Diagnostics/ and the csproj.
 
             // Stands up its own window and closes it; nothing else in the app is
             // involved, so it runs before the library gates and returns.
@@ -127,6 +133,7 @@ public partial class App : Application
                 ShowLibrary();
                 return;
             }
+#endif
 
             if (settings.FirstRunShown)
             {
@@ -435,6 +442,7 @@ public partial class App : Application
         HideLibraryForCapture();
         var frozen = _grabber.Grab();
 
+#if DEBUG
         // Manual, re-auditable 1:1-rendering verification harness (see
         // Diagnostics.OverlayVerification for how to run it, including the
         // required negative control). Completely inert — one env-var read, no
@@ -444,6 +452,7 @@ public partial class App : Application
             Diagnostics.OverlayVerification.Run(frozen);
             return;
         }
+#endif
 
         _session = new CaptureSession(frozen);
         // Abort() raises Aborted and then Cancel(), so every non-commit exit —

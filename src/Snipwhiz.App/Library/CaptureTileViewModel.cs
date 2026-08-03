@@ -139,8 +139,13 @@ public sealed class CaptureTileViewModel(CaptureRecord record, ThumbnailCache ca
                 // thumbnail path never changes but its contents do — every time a
                 // capture is edited — so without this a re-decode is served the
                 // bitmap from before the edit and the tile silently stays stale.
-                if (!Diagnostics.RefreshVerification.BreakImageCache)
-                    bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+#if DEBUG
+                // Negative control for the refresh gate: None is the default, so
+                // putting it back is what serves the pre-edit decode again.
+                if (Diagnostics.RefreshVerification.BreakImageCache)
+                    bitmap.CreateOptions = BitmapCreateOptions.None;
+#endif
                 bitmap.UriSource = new Uri(path);
                 bitmap.EndInit();
                 bitmap.Freeze();

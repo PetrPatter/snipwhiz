@@ -77,6 +77,23 @@
     <AdditionalFiles Include="NativeMethods.txt" />
   </ItemGroup>
 
+  <!--
+    The verification harnesses do not ship. They are how this project's gates are
+    run - each one env-gated, and nine of them able to sabotage real behaviour on
+    purpose so a negative control has something to fail against. That is the right
+    tool for a gate and the wrong thing to install on somebody's machine: a shipped
+    build has no business carrying the code to make its own save throw or its own
+    thumbnails leak.
+
+    Excluded here, and every call site is inside #if DEBUG. Both are needed - the
+    exclusion alone would not compile, and the guards alone would leave the harness
+    in the binary. scripts\verify-atomic-write.ps1 already drives bin\Debug, so
+    nothing that runs these is affected.
+  -->
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <Compile Remove="Diagnostics\**" />
+  </ItemGroup>
+
   <!-- Also embedded as a resource, separately from ApplicationIcon. The tray needs
        to pick a specific frame out of the .ico at the size Windows is asking for,
        and ExtractAssociatedIcon only ever hands back 32px, which is then squashed

@@ -35,12 +35,15 @@ internal sealed class SavePipeline(CaptureStore store, ThumbnailCache thumbnails
     /// <summary>The render failed. The annotations are safe; the tile will show the original.</summary>
     public event Action<CaptureRecord, Exception>? RenderFailed;
 
+#if DEBUG
     /// <summary>
     /// Env-gated control for the failure path, which is otherwise unreachable
-    /// without corrupting something.
+    /// without corrupting something. Debug only — a shipped build has no way to
+    /// make its own save throw.
     /// </summary>
     public static bool BreakFlatten =>
         Environment.GetEnvironmentVariable("SNIPWHIZ_VERIFY_BREAK_FLATTEN") == "1";
+#endif
 
     public void Save(CaptureRecord record, SceneDocument document, BitmapSource source)
     {
@@ -105,7 +108,9 @@ internal sealed class SavePipeline(CaptureStore store, ThumbnailCache thumbnails
 
             try
             {
+#if DEBUG
                 if (BreakFlatten) throw new InvalidOperationException("SNIPWHIZ_VERIFY_BREAK_FLATTEN");
+#endif
 
                 // Parsed back rather than reusing the live document: an independent
                 // object graph, so nothing here races the UI thread.

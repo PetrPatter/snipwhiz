@@ -121,6 +121,7 @@ public partial class LibraryWindow : Window
             RowsHost.ApplyTemplate();
             _scroller = RowsHost.Template.FindName("Scroller", RowsHost) as ScrollViewer;
 
+#if DEBUG
             // Negative control for the virtualization gate: a plain StackPanel
             // realizes every row, which is exactly what the gate must detect.
             if (Diagnostics.GridVerification.BreakVirtualization)
@@ -132,16 +133,19 @@ public partial class LibraryWindow : Window
                     </ItemsPanelTemplate>
                     """);
             }
+#endif
 
             ApplyColumns();
             _model.Reload();
             RefreshFooter();
 
+#if DEBUG
             if (Diagnostics.GridVerification.IsEnabled && _scroller is not null)
                 Diagnostics.GridVerification.Sweep(RowsHost, _scroller,
                     () => _model.Count, () => _model.RetainedThumbnails);
 
             Diagnostics.ResizeVerification.Run(this, RowsHost);
+#endif
         };
 
         SizeChanged += (_, _) => ApplyColumns();
@@ -236,7 +240,11 @@ public partial class LibraryWindow : Window
         _copyAfterSave?.TrySetResult(saved);
 
         _editor?.OnSaved(saved);
+#if DEBUG
+        // Negative control for the refresh gate: skipping the replace is the defect
+        // the gate exists to catch.
         if (Diagnostics.RefreshVerification.BreakRefresh) return;
+#endif
         _model.Replace(saved);
     }
 

@@ -214,6 +214,7 @@ public partial class CaptureTile : System.Windows.Controls.UserControl
         _boundTo = null;
         releasing.RemoveBinding();
 
+#if DEBUG
         // Negative control for the resize gate: dropping it here is what turned
         // on-screen tiles black.
         if (Diagnostics.ResizeVerification.BreakRelease)
@@ -221,6 +222,7 @@ public partial class CaptureTile : System.Windows.Controls.UserControl
             releasing.ReleaseThumbnail();
             return;
         }
+#endif
 
         Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
