@@ -2,7 +2,7 @@
 
 **The library and the editor**, which are the two screens people spend time in.
 
-Mockup: `docs/superpowers/mockups/visual-pass.html` — the direction was settled by
+Mockup: `docs/mockups/visual-pass.html` — the direction was settled by
 looking at a rendered comparison rather than by argument, which is the same method
 that settled the icon and the same method spec 1 used before any app code existed.
 

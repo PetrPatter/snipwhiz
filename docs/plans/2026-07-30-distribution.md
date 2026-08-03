@@ -1,6 +1,6 @@
 # Distribution — Implementation Plan
 
-Spec: [`2026-07-30-distribution-design.md`](../specs/2026-07-30-distribution-design.md)
+Spec: [`2026-07-30-distribution-design.md`](../design/2026-07-30-distribution-design.md)
 
 **Goal:** a person who did not build Snipwhiz can install it, use it, and receive
 the next version without being asked to do anything.

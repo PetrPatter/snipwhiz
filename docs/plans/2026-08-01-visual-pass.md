@@ -1,6 +1,6 @@
 ﻿# Visual pass — Implementation Plan
 
-Spec: [`2026-08-01-visual-pass-design.md`](../specs/2026-08-01-visual-pass-design.md)
+Spec: [`2026-08-01-visual-pass-design.md`](../design/2026-08-01-visual-pass-design.md)
 Mockup: [`visual-pass.html`](../mockups/visual-pass.html)
 
 **Goal:** the library and the editor look like they were designed rather than

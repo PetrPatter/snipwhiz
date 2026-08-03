@@ -1,14 +1,12 @@
 # Snipwhiz Capture Core Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Press a hotkey, drag a region, and the image lands on the clipboard, on disk, and in a SQLite history database — correctly, on multi-monitor setups with mismatched DPI.
 
 **Architecture:** Freeze-first capture. One `BitBlt` over the whole virtual desktop at hotkey time produces an immutable `FrozenDesktop`; opaque per-monitor overlay windows render slices of it at exactly 1:1 physical pixels; the final capture is a crop of that same bitmap, so displayed pixels and saved pixels can never disagree. All geometry is kept in virtual-screen physical pixels and converted to DIPs only at the WPF boundary.
 
 **Tech Stack:** .NET 10 · WPF + WinForms (`NotifyIcon`) · `Microsoft.Windows.CsWin32` (P/Invoke generation) · `Microsoft.Data.Sqlite` · `System.Drawing.Common` (PNG encode) · xUnit
 
-**Spec:** `docs/superpowers/specs/2026-07-25-capture-core-design.md` — read §4 before starting.
+**Spec:** `docs/design/2026-07-25-capture-core-design.md` — read §4 before starting.
 
 ## Global Constraints
 
@@ -3322,13 +3320,13 @@ API to ask who owns a hotkey, so we check for the usual suspects."
 ### Task 12: Full manual verification
 
 **Files:**
-- Create: `docs/superpowers/plans/2026-07-25-capture-core-verification.md`
+- Create: `docs/plans/2026-07-25-capture-core-verification.md`
 
 No code. This is the spec's §7 checklist run for real, with results recorded. **Every item is a known failure mode of screenshot tools, not a formality.**
 
 - [ ] **Step 1: Create the results document**
 
-Create `docs/superpowers/plans/2026-07-25-capture-core-verification.md` with this table, and fill in every row as you go:
+Create `docs/plans/2026-07-25-capture-core-verification.md` with this table, and fill in every row as you go:
 
 ```markdown
 # Capture Core — Verification Results

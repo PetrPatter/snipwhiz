@@ -1,14 +1,12 @@
 # Snipwhiz Library Shell Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** A hotkey opens a window showing every past capture, newest first, grouped by day. Clicking one opens it full-size; `Ctrl+C` or a button copies it to the clipboard. Search narrows by source app or window title. Delete removes both the row and the file, with a real undo window first.
 
 **Architecture:** Pure WPF over the existing `Snipwhiz.Core`. No WebView2, no IPC — the store already hands back records in-process. The grid virtualizes by chunking tiles into rows in the view model and feeding the stock `VirtualizingStackPanel`, so no custom panel is written. SQLite stays on the UI thread; every decode, encode, clipboard write and directory walk goes to the thread pool.
 
 **Tech Stack:** .NET 10 · WPF + WinForms (`NotifyIcon`) · `Microsoft.Windows.CsWin32` · `Microsoft.Data.Sqlite` · `System.Drawing.Common` · xUnit
 
-**Spec:** `docs/superpowers/specs/2026-07-26-library-shell-design.md` — read §4 before starting.
+**Spec:** `docs/design/2026-07-26-library-shell-design.md` — read §4 before starting.
 
 ## Global Constraints
 
@@ -643,7 +641,7 @@ Search mixed case, partial words, and a literal `%`. Capture with the window ope
 
 ### Task 11: Full manual verification
 
-Spec §7. Work the table end to end and write the results to `docs/superpowers/plans/2026-07-26-library-shell-verification.md`, following spec 1's verification doc: cite evidence for every PASS so it can be re-audited rather than taken on trust.
+Spec §7. Work the table end to end and write the results to `docs/plans/2026-07-26-library-shell-verification.md`, following spec 1's verification doc: cite evidence for every PASS so it can be re-audited rather than taken on trust.
 
 - [ ] **Step 1: Run every check in spec §7, checks 1 through 12**
 - [ ] **Step 2: Run the negative controls and record their failing output**
